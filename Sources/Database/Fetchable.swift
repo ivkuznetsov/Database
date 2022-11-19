@@ -101,7 +101,7 @@ public protocol FetchableValidation {
 
 public extension NSManagedObjectContext {
     
-    func parse<T: Fetchable & NSManagedObject>(_ type: T.Type, array: [[String:Any]]?, additional: ((T, [String:Any])->())?) -> [T] {
+    func parse<T: Fetchable & NSManagedObject>(_ type: T.Type, array: [[String:Any]]?, additional: ((T, [String:Any])->())? = nil) -> [T] {
         guard let array = array else {
             return []
         }
