@@ -95,7 +95,7 @@ public class Database {
             
             let appNotification = AppNotification(created: extract("inserted"),
                                                   updated: extract("updated"),
-                                                  deleted: extract("updated"))
+                                                  deleted: extract("deleted"))
             
             DispatchQueue.main.async { [weak self] in
                 self?.viewContext.mergeChanges(fromContextDidSave: notification)

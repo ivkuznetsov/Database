@@ -13,6 +13,17 @@ public class DBObservable<T: NSManagedObject> {
     
     public init(wrappedValue value: T?) {
         self.value = value
+        addObserver()
+    }
+    
+    private func addObserver() {
+        value?.add(observer: self, closure: { [unowned self] _ in
+            if self.value?.isObjectDeleted == true {
+                self.wrappedValue = nil
+            } else {
+                self.valueDidChange(replaced: false)
+            }
+        })
     }
     
     public var wrappedValue: T? {
@@ -21,13 +32,7 @@ public class DBObservable<T: NSManagedObject> {
             if value != newValue {
                 value = newValue
                 value?.remove(observer: self)
-                value?.add(observer: self, closure: { [unowned self] _ in
-                    if self.value?.isObjectDeleted == true {
-                        self.wrappedValue = nil
-                    } else {
-                        self.valueDidChange(replaced: false)
-                    }
-                })
+                addObserver()
                 valueDidChange(replaced: true)
             }
         }
