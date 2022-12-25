@@ -19,6 +19,8 @@ public class CodableTransformer: ValueTransformer {
                 self = .string(value)
             } else if let value = value as? NSNumber {
                 self = .number(try! JSONSerialization.data(withJSONObject: [value]))
+            } else if let value = value as? [String] {
+                self = .array(value.compactMap { .string($0) })
             } else if let value = value as? [Encodable] {
                 self = .array(value.compactMap { Value(value: $0) })
             } else if let value = value as? AnyObject & Encodable {
