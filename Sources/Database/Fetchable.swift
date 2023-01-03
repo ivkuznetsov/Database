@@ -105,6 +105,7 @@ public extension NSManagedObjectContext {
         guard let array = array else {
             return []
         }
+        var resultSet = Set<String>()
         var result: [T] = []
         
         for serviceObject in array {
@@ -116,7 +117,7 @@ public extension NSManagedObjectContext {
             
             var object = findFirst(type, "uid == %@", uid)
             
-            if uid == "0" {
+            if uid == "0" || resultSet.contains(uid) {
                 continue
             }
             if object == nil {
@@ -126,6 +127,7 @@ public extension NSManagedObjectContext {
             object!.update(serviceObject)
             additional?(object!, serviceObject)
             
+            resultSet.insert(uid)
             result.append(object!)
         }
         return result
