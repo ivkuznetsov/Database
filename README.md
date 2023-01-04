@@ -46,7 +46,7 @@ database.editWith(object) { object, ctx in
 }
 ```
 
-##Observing changes
+## Observing changes
 
 The editing happens asynchronously. When the changes are saved in persistent storage, the objects in viewContext will fetch the updates. To react on these changes you can use Combine, or subscribe to object updates by:
 
@@ -82,7 +82,7 @@ _object.didChange = { replaced in
 }
 ```
 
-##Database + Work
+## Database + Work
 
 The Database also has an NSOperation interface for fetching and editing. It uses a Work wrapper implemented in CommonUtils package.
 With this you can easily interact with managed objects in the operation chains.
