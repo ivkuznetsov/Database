@@ -8,11 +8,20 @@
 import CoreData
 import CommonUtils
 
+public protocol ValueOnMoc { }
+
+extension ValueOnMoc where Self: NSManagedObject {
+    
+    func async<T>(_ keyPath: KeyPath<Self, T>) async throws -> T {
+        try await onMoc { self[keyPath: keyPath] }
+    }
+}
+
 public extension NSManagedObject {
     
     func onMoc<T>(_ block: @escaping ()->T) async throws -> T {
         if let ctx = managedObjectContext {
-            if #available(iOS 15, *) {
+            if #available(iOS 15, macOS 12, *) {
                 return await ctx.perform { block() }
             } else {
                 return await withCheckedContinuation { continuation in
@@ -31,7 +40,7 @@ public extension Database {
     func edit<T>(_ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> T) async throws -> T {
         try await onEdit {
             let context = createPrivateContext()
-            if #available(iOS 15, *) {
+            if #available(iOS 15, macOS 12, *) {
                 return try await context.perform {
                     let result = try closure(context)
                     context.saveAll()
@@ -86,7 +95,7 @@ public extension Database {
     func fetch<T>(_ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> T) async throws -> T {
         let context = createPrivateContext()
         
-        if #available(iOS 15, *) {
+        if #available(iOS 15, macOS 12, *) {
             return try await context.perform {
                 return try closure(context)
             }
