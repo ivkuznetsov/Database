@@ -10,7 +10,7 @@ import CommonUtils
 
 public protocol ValueOnMoc { }
 
-extension ValueOnMoc where Self: NSManagedObject {
+public extension ValueOnMoc where Self: NSManagedObject {
     
     func async<T>(_ keyPath: KeyPath<Self, T>) async throws -> T {
         try await onMoc { self[keyPath: keyPath] }
