@@ -145,14 +145,16 @@ extension NSManagedObjectContext {
                 do {
                     try save()
                     
-                    if let parent = parent, parent.hasChanges {
+                    if let parent = parent {
                         parent.performAndWait {
-                            do {
-                                parent.savingChild = self
-                                try parent.save()
-                                parent.savingChild = nil
-                            } catch {
-                                os_log("%@\n%@", error.localizedDescription, (error as NSError).userInfo)
+                            if parent.hasChanges {
+                                do {
+                                    parent.savingChild = self
+                                    try parent.save()
+                                    parent.savingChild = nil
+                                } catch {
+                                    os_log("%@\n%@", error.localizedDescription, (error as NSError).userInfo)
+                                }
                             }
                         }
                     }

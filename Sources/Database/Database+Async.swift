@@ -8,12 +8,29 @@
 import CoreData
 import CommonUtils
 
+public extension NSManagedObject {
+    
+    func value<T>(_ block: @escaping ()->T) async throws -> T {
+        if let ctx = managedObjectContext {
+            if #available(iOS 15, *) {
+                return await ctx.perform { block() }
+            } else {
+                return await withCheckedContinuation { continuation in
+                    ctx.perform {
+                        continuation.resume(with: .success(block()))
+                    }
+                }
+            }
+        }
+        throw RunError.cancelled
+    }
+}
+
 public extension Database {
     
     func edit<T>(_ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> T) async throws -> T {
         try await onEdit {
             let context = createPrivateContext()
-            
             if #available(iOS 15, *) {
                 return try await context.perform {
                     let result = try closure(context)
