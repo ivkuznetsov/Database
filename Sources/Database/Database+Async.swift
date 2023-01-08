@@ -17,6 +17,8 @@ public extension ValueOnMoc where Self: NSManagedObject {
     }
 }
 
+extension NSManagedObject: ValueOnMoc {}
+
 public extension NSManagedObject {
     
     func onMoc<T>(_ block: @escaping ()->T) async throws -> T {
