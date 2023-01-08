@@ -10,7 +10,7 @@ import CommonUtils
 
 public extension NSManagedObject {
     
-    func value<T>(_ block: @escaping ()->T) async throws -> T {
+    func onMoc<T>(_ block: @escaping ()->T) async throws -> T {
         if let ctx = managedObjectContext {
             if #available(iOS 15, *) {
                 return await ctx.perform { block() }
