@@ -12,8 +12,15 @@ public protocol ValueOnMoc { }
 
 public extension ValueOnMoc where Self: NSManagedObject {
     
-    func async<T>(_ keyPath: KeyPath<Self, T>) async throws -> T {
-        try await onMoc { self[keyPath: keyPath] }
+    var async: AsyncValue<Self> { AsyncValue(value: self) }
+}
+
+@dynamicMemberLookup
+public struct AsyncValue<Value: NSManagedObject> {
+    fileprivate let value: Value
+
+    public subscript<T>(dynamicMember keyPath: KeyPath<Value, T>) -> () async throws -> T {
+        { try await value.onMoc { value[keyPath: keyPath] } }
     }
 }
 
@@ -41,7 +48,7 @@ public extension Database {
     
     func edit<T>(_ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> T) async throws -> T {
         try await onEdit {
-            let context = createPrivateContext()
+            let context = self.createPrivateContext()
             if #available(iOS 15, macOS 12, *) {
                 return try await context.perform {
                     let result = try closure(context)
@@ -99,7 +106,7 @@ public extension Database {
         
         if #available(iOS 15, macOS 12, *) {
             return try await context.perform {
-                return try closure(context)
+                try closure(context)
             }
         } else {
             return try await withCheckedThrowingContinuation { continuation in

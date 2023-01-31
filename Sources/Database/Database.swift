@@ -9,12 +9,6 @@ import os.log
 
 public class Database {
     
-    private actor EditPerformer {
-        func perform<T>(_ closure: () async throws ->T) async rethrows -> T {
-            try await closure()
-        }
-    }
-    
     private class WeakContext {
         weak var context: NSManagedObjectContext?
         
@@ -23,7 +17,7 @@ public class Database {
         }
     }
     
-    private let editPerformer = EditPerformer()
+    private let serialTask = SerialTasks()
     private let serialQueue = DispatchQueue(label: "database.serialqueue")
     private let storeCoordinator: NSPersistentStoreCoordinator
     private let storeDescriptions: [StoreDescription]
@@ -57,8 +51,8 @@ public class Database {
     }
     
     @discardableResult
-    func onEdit<T>(_ closure: () async throws ->T) async rethrows -> T {
-        try await editPerformer.perform {
+    func onEdit<T>(_ closure: @escaping () async throws ->T) async throws -> T {
+        try await serialTask.run {
             try await closure()
         }
     }
