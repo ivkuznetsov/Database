@@ -6,48 +6,107 @@ import Foundation
 import CoreData
 import CommonUtils
 import os.log
+import Combine
 
 public class Database {
     
-    private class WeakContext {
-        weak var context: NSManagedObjectContext?
-        
-        init(_ context: NSManagedObjectContext) {
-            self.context = context
+    @RWAtomic  private static var internalGlobal: Database?
+    
+    static var global: Database {
+        if let global = internalGlobal {
+            return global
         }
+        fatalError("You need to set global Database by Databae.setup(global:)")
+    }
+    
+    public static func setup(global: Database) {
+        internalGlobal = global
     }
     
     private let serialTask = SerialTasks()
-    private let serialQueue = DispatchQueue(label: "database.serialqueue")
-    private let storeCoordinator: NSPersistentStoreCoordinator
-    private let storeDescriptions: [StoreDescription]
+    private let container: NSPersistentCloudKitContainer
     
-    public let viewContext: NSManagedObjectContext = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
-    public let writerContext: NSManagedObjectContext = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+    public var viewContext: NSManagedObjectContext { container.viewContext }
+    public let writerContext: NSManagedObjectContext
     
-    @RWAtomic private var privateContextsForMerge: [WeakContext] = []
-    
-    public init(storeDescriptions: [StoreDescription] = [StoreDescription.userDataStore],
+    public init(storeDescriptions: [NSPersistentStoreDescription] = [.dataStore()],
                 modelBundle: Bundle = Bundle.main) {
         
-        let objectModel = NSManagedObjectModel.mergedModel(from: [modelBundle])!
-        storeCoordinator = NSPersistentStoreCoordinator(managedObjectModel: objectModel)
-        self.storeDescriptions = storeDescriptions
+        let model = NSManagedObjectModel.mergedModel(from: [modelBundle])!
+        container = NSPersistentCloudKitContainer(name: "Database", managedObjectModel: model)
         
-        writerContext.persistentStoreCoordinator = storeCoordinator
+        writerContext = container.newBackgroundContext()
+        writerContext.automaticallyMergesChangesFromParent = true
         writerContext.mergePolicy = NSOverwriteMergePolicy
         
-        viewContext.persistentStoreCoordinator = storeCoordinator
         viewContext.mergePolicy = NSRollbackMergePolicy
+        viewContext.name = "view"
+        viewContext.automaticallyMergesChangesFromParent = true
+        container.persistentStoreDescriptions = storeDescriptions
         
-        for identifier in storeCoordinator.managedObjectModel.configurations {
-            addStore(configuration: identifier, coordinator: storeCoordinator)
+        NotificationCenter.default.publisher(for: NSManagedObjectContext.didMergeChangesObjectIDsNotification).sink { [weak self] in
+            self?.didMerge($0)
+        }.retained(by: self)
+        
+        setup()
+    }
+    
+    public struct Change {
+        public let classes: Set<String>
+        public let inserted: Set<NSManagedObjectID>
+        public let updated: Set<NSManagedObjectID>
+        public let deleted: Set<NSManagedObjectID>
+    }
+    
+    private let objectsPublisher = PassthroughSubject<Change, Never>()
+    public var objectsDidChange: AnyPublisher<Change, Never> { objectsPublisher.eraseToAnyPublisher() }
+    
+    private func didMerge(_ notification: Notification) {
+        if let context = notification.object as? NSManagedObjectContext,
+            context == viewContext,
+            let userInfo = notification.userInfo {
+            
+            var classes = Set<String>()
+            
+            let extract: (String)->Set<NSManagedObjectID> = { key in
+                let set = userInfo[key] as? Set<NSManagedObjectID> ?? Set()
+                
+                return Set(set.compactMap { objectId in
+                    guard let className = objectId.entity.name else { return nil }
+                    
+                    if className.hasPrefix("NSCK") { return nil } //skip system items
+                    
+                    classes.insert(className)
+                    return objectId
+                })
+            }
+            
+            let inserted = extract("inserted_objectIDs")
+            let updated = extract("updated_objectIDs")
+            let deleted = extract("deleted_objectIDs")
+            
+            if classes.count > 0 {
+                objectsPublisher.send(Change(classes: classes,
+                                             inserted: inserted,
+                                             updated: updated,
+                                             deleted: deleted))
+            }
         }
-        
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(contextChanged(notification:)),
-                                               name: Notification.Name.NSManagedObjectContextDidSave,
-                                               object: nil)
+    }
+    
+    private func setup() {
+        container.loadPersistentStores { description, error in
+            if let error = error {
+                os_log("Error while creating persistent store: %@ for configuration %@", error.localizedDescription, description.configuration!)
+                
+                if (error as NSError).code == 134110 { //couldn't migrate in-place
+                    description.removeStoreFiles()
+                    self.setup()
+                }
+            } else {
+                os_log("Store has been added: %@", description.url!.path)
+            }
+        }
     }
     
     @discardableResult
@@ -57,106 +116,18 @@ public class Database {
         }
     }
     
-    @discardableResult
-    func onEditQueueSync<T>(_ closure: ()->T) -> T {
-        serialQueue.sync(execute: closure)
-    }
-    
-    func onEditQueue(_ closure: @escaping ()->()) {
-        serialQueue.async(execute: closure)
-    }
-    
     public func idFor(uriRepresentation: URL) -> NSManagedObjectID? {
-        storeCoordinator.managedObjectID(forURIRepresentation: uriRepresentation)
+        container.persistentStoreCoordinator.managedObjectID(forURIRepresentation: uriRepresentation)
     }
     
     public func createPrivateContext(mergeChanges: Bool) -> NSManagedObjectContext {
         let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        context.automaticallyMergesChangesFromParent = mergeChanges
         context.parent = writerContext
-        if mergeChanges {
-            _privateContextsForMerge.mutate { $0.append(WeakContext(context)) }
-        }
         return context
     }
     
     public func createPrivateContext() -> NSManagedObjectContext {
         createPrivateContext(mergeChanges: false)
-    }
-    
-    func log(_ message: String) {
-        os_log("%@", message)
-    }
-    
-    @objc func contextChanged(notification: Notification) {
-        if let context = notification.object as? NSManagedObjectContext, context == writerContext {
-            
-            var classes = Set<String>()
-            
-            let extract: (String)->Set<URL> = { key in
-                let set = notification.userInfo?[key] as? Set<NSManagedObject> ?? Set()
-                
-                return Set(set.map { object in
-                    classes.insert(String(describing: type(of: object)))
-                    return object.objectID.uriRepresentation()
-                })
-            }
-            
-            let appNotification = AppNotification(created: extract("inserted"),
-                                                  updated: extract("updated"),
-                                                  deleted: extract("deleted"))
-            
-            DispatchQueue.main.async { [weak self] in
-                self?.viewContext.mergeChanges(fromContextDidSave: notification)
-                
-                NotificationManager.shared.postNotification(names: Array(classes), notification: appNotification)
-            }
-            
-            _privateContextsForMerge.mutate {
-                $0.removeAll {
-                    if let mergeContext = $0.context {
-                        if context.savingChild != mergeContext {
-                            mergeContext.perform {
-                                mergeContext.mergeChanges(fromContextDidSave: notification)
-                            }
-                        }
-                        return false
-                    } else {
-                        return true
-                    }
-                }
-            }
-        }
-    }
-    
-    private func storeDescriptionFor(configuration: String) -> StoreDescription {
-        storeDescriptions.first { $0.configuration == configuration }!
-    }
-    
-    private func addStore(configuration: String, coordinator: NSPersistentStoreCoordinator) {
-        let description = storeDescriptionFor(configuration: configuration)
-        
-        var options: [String : Any] = [NSMigratePersistentStoresAutomaticallyOption : true, NSInferMappingModelAutomaticallyOption : true]
-        
-        if description.readOnly {
-            options[NSReadOnlyPersistentStoreOption] = true
-        }
-        description.options.forEach { options[$0.key] = $0.value }
-        
-        do {
-            try coordinator.addPersistentStore(ofType: description.storeType, configurationName: configuration, at: description.url, options: options)
-            
-            os_log("Store has been added: %@", description.url.path)
-        } catch {
-            os_log("Error while creating persistent store: %@ for configuration %@", error.localizedDescription, configuration)
-            
-            if description.deleteOnError {
-                description.removeStoreFiles()
-                addStore(configuration: configuration, coordinator: coordinator)
-            }
-        }
-    }
-    
-    deinit {
-        NotificationCenter.default.removeObserver(self)
     }
 }

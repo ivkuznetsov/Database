@@ -52,45 +52,20 @@ public extension Fetchable {
         }
     }
     
-    static func id(serviceObject: [AnyHashable : Any]) -> String {
+    static func id(serviceObject: [AnyHashable : Any]) -> String? {
         if let item = self as? CustomId.Type {
             return item.id(from: serviceObject)
         }
         
-        var uid: String! = serviceObject["uid"] as? String ?? serviceObject["id"] as? String
+        var uid = serviceObject["uid"] as? String ?? serviceObject["id"] as? String
         
         if uid == nil, let id = serviceObject["id"] as? Int64 {
             uid = "\(id)"
         }
         if uid == nil {
-            uid = "0"
-        }
-        if uid == "0" {
             print("ID is not found, throwed by class: \(String(describing: self))")
         }
         return uid
-    }
-}
-
-public extension Fetchable where Self: NSManagedObject {
-    
-    func parse<T: Fetchable & NSManagedObject>(_ dict: [AnyHashable : Any], _ dbKey: ReferenceWritableKeyPath<Self, T?>, _ serviceKey: String) {
-        if let value = dict[serviceKey] {
-            self[keyPath: dbKey] = self.managedObjectContext?.findAndUpdate(T.self, serviceObject: value as? [String : Any])
-        }
-    }
-    
-    func parse<T: Fetchable & NSManagedObject>(_ dict: [AnyHashable : Any], _ dbKey: ReferenceWritableKeyPath<Self, Set<T>?>, _ serviceKey: String) {
-        if let value = dict[serviceKey] {
-            var array: [[String : Any]] = []
-            
-            if let value = value as? [[String : Any]] {
-                array = value
-            } else if let value = value as? [Int64] {
-                array = value.map { return ["id" : $0] }
-            }
-            self[keyPath: dbKey] = Set(self.managedObjectContext?.parse(T.self, array: array, additional: nil) ?? [])
-        }
     }
 }
 
@@ -99,69 +74,74 @@ public protocol FetchableValidation {
     static func isValid(dict: [String : Any]) -> Bool
 }
 
-public extension NSManagedObjectContext {
+public extension Fetchable where Self: NSManagedObject {
     
-    func parse<T: Fetchable & NSManagedObject>(_ type: T.Type, array: [[String:Any]]?, additional: ((T, [String:Any])->())? = nil) -> [T] {
+    func parse<T: Fetchable & NSManagedObject>(_ dict: [String:Any], _ dbKey: ReferenceWritableKeyPath<Self, T?>, _ serviceKey: String) {
+        if let value = dict[serviceKey], let ctx = managedObjectContext {
+            self[keyPath: dbKey] = T.findAndUpdate(serviceObject: value as? [String:Any], ctx: ctx)
+        }
+    }
+    
+    func parse<T: Fetchable & NSManagedObject>(_ dict: [String:Any], _ dbKey: ReferenceWritableKeyPath<Self, Set<T>?>, _ serviceKey: String) {
+        if let value = dict[serviceKey], let ctx = managedObjectContext {
+            var array: [[String : Any]] = []
+            
+            if let value = value as? [[String : Any]] {
+                array = value
+            } else if let value = value as? [Int64] {
+                array = value.map { return ["id" : $0] }
+            }
+            self[keyPath: dbKey] = Set(T.parse(array, ctx: ctx))
+        }
+    }
+    
+    static func parse(_ array: [[String:Any]]?, additional: ((Self, [String:Any])->())? = nil, ctx: NSManagedObjectContext) -> [Self] {
         guard let array = array else {
             return []
         }
         var resultSet = Set<String>()
-        var result: [T] = []
+        var result: [Self] = []
         
         for serviceObject in array {
-            
-            if let type = type as? FetchableValidation.Type, type.isValid(dict: serviceObject) == false {
-                continue
+            if let object = findAndUpdate(serviceObject: serviceObject, ctx: ctx),
+               !resultSet.contains(object.uid!) {
+                resultSet.insert(object.uid!)
+                result.append(object)
             }
-            let uid = type.id(serviceObject: serviceObject)
-            
-            var object = findFirst(type, "uid == %@", uid)
-            
-            if uid == "0" || resultSet.contains(uid) {
-                continue
-            }
-            if object == nil {
-                object = create(type)
-                object!.uid = uid
-            }
-            object!.update(serviceObject)
-            additional?(object!, serviceObject)
-            
-            resultSet.insert(uid)
-            result.append(object!)
         }
         return result
     }
     
-    func findOrCreatePlaceholder<T: Fetchable & NSManagedObject>(_ type: T.Type, uid: Any?) -> T? {
-        if let uid = uid as? Int64 {
-            return findOrCreatePlaceholder(type, uid: uid)
-        } else if let uid = uid as? String {
-            return findOrCreatePlaceholder(type, uid: String(uid))
-        }
-        return nil
-    }
-    
-    func findOrCreatePlaceholder<T: Fetchable & NSManagedObject>(_ type: T.Type, uid: String?) -> T? {
+    static func findOrCreatePlaceholder(uid: String?, ctx: NSManagedObjectContext) -> Self? {
         guard let uid = uid else {
             return nil
         }
-        var object = findFirst(type, "uid == %@", uid)
+        var object: Self
         
-        if object == nil {
-            object = create(type)
+        if let found = findFirst(ctx: ctx, "uid == %@", uid) {
+            object = found
+        } else {
+            object = self.init(context: ctx)
+            object.uid = uid
         }
-        object!.uid = uid
-        return object!
+        return object
     }
     
-    func findAndUpdate<T: Fetchable & NSManagedObject>(_ type: T.Type, serviceObject: [String:Any]?) -> T? {
+    static func findAndUpdate(serviceObject: [String:Any]?, ctx: NSManagedObjectContext) -> Self? {
         guard let serviceObject = serviceObject else {
             return nil
         }
-        let uid = type.id(serviceObject: serviceObject)
-        let object = findOrCreatePlaceholder(type, uid: uid)
-        object?.update(serviceObject)
+        
+        if let type = self as? FetchableValidation.Type, type.isValid(dict: serviceObject) == false {
+            return nil
+        }
+        
+        guard let uid = id(serviceObject: serviceObject),
+              let object = findOrCreatePlaceholder(uid: uid, ctx: ctx) else {
+            return nil
+        }
+        
+        object.update(serviceObject)
         return object
     }
 }

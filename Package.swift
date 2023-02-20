@@ -7,19 +7,15 @@ let package = Package(
     name: "Database",
     platforms: [
         .macOS(.v10_15),
-        .iOS(.v13)
+        .iOS(.v14)
     ],
     products: [
-        .library(
-            name: "Database",
-            targets: ["Database"]),
+        .library(name: "Database", targets: ["Database"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ivkuznetsov/CommonUtils.git", branch: "main"),
+        .package(url: "https://github.com/ivkuznetsov/CommonUtils.git", branch: "main")
     ],
     targets: [
-        .target(
-            name: "Database",
-            dependencies: ["CommonUtils"]),
+        .target(name: "Database", dependencies: ["CommonUtils"])
     ]
 )

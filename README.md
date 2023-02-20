@@ -13,93 +13,58 @@ All the changes are made using the private contexts asynchronously by the suppli
 Retrieving managed objects from persistent storage:
 
 ```swift
-let objects = database.viewContext.all(Model.self)
+let objects = Model.all(database.viewContext)
 ```
 
 It's better to retrieve objects with some complex filtering in background context to prevent freezing the ui:
 
 ```swift
-database.fetch { ctx in
-    let ids = ctx.find(Model.self, \.text, "some text").ids
-    
-    DispatchQueue.main.async {
-        let objects = database.viewContext.objectsWith(ids: ids)
-    }
-}
+let objects = try await database.fetch { ctx in
+   Model.find(\.text, "some text", ctx: ctx).ids
+}.objects(database.viewContext)
 ```
 
-Creating new object in persistent storage:
+Create a new object in the persistent storage:
 
 ```swift
-database.edit { ctx in
-    ctx.create(Model.self)
+try await database.edit { ctx in
+    Model(context: ctx)
 }
 ```
 
-Editing an existing object:
+Edit an existing object:
 
 ```swift
 let object: Model
 
-database.editWith(object) { object, ctx in
+try await object.edit(database) { object, ctx in
     object.value = "new"
 }
 ```
 
 ## Observing changes
 
-The editing happens asynchronously. When the changes are saved in persistent storage, the objects in viewContext will fetch the updates. To react on these changes you can use Combine, or subscribe to object updates by:
+The editing happens asynchronously. When the changes are saved in the persistent storage, the objects in viewContext will fetch the updates. To react on these changes you can use objectWillChange publisher:
 
 ```swift
-model.add(observer: self) { notification in
+model.objectWillChange.sink {
     
 }
 ```
 
-You can subscribe to notifications about new/deleted/updated objects of specified NSManagedObject
+You can subscribe to publisher about new/deleted/updated objects of specified NSManagedObject
 
 ```swift
-User.add(observer: self, closure: { notification in
-    
+User.objectsDidChange(database).sink { change in
+
 }
 ```
 
 Or several classes. In the notification you can retrieve the ObjectIds of the objects with changes
 
 ```swift
-NSManagedObject.add(observer: self, closure: { notification in
-    
-}, classes: [User.self, Post.self, Commit.self])
-```
+[User.self, Post.self, Commit.self].objectsDidChange(database).sink { change in
 
-You can use a @DBObservable property wrapper to handle changes of the managed object:
-
-```swift
-@DBObservable var object: Model?
-
-_object.didChange = { replaced in
-    // update the UI
-}
-```
-
-## Database + Work
-
-The Database also has an NSOperation interface for fetching and editing. It uses a Work wrapper implemented in CommonUtils package.
-With this you can easily interact with managed objects in the operation chains.
-
-```swift
-func retrieveObjectsFromBackend() -> Work<[[String:Any]]> {
-    // do the network request
-}
-
-let work = retrieveObjectsFromBackend().then { array in
-    self.database.editOp { ctx in
-        // parse managed objects from the array
-    }
-}
-
-work.runWith { error in
-    
 }
 ```
 
