@@ -13,7 +13,7 @@ public protocol ManagedObjectHelpers { }
 
 public extension ManagedObjectHelpers where Self: NSManagedObject {
     
-    static func all() -> [Self] {
+    @MainActor static func all() -> [Self] {
         all(Database.global.viewContext)
     }
     
@@ -28,16 +28,16 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return []
     }
     
-    static func allSorted() -> [Self] {
+    @MainActor static func allSorted() -> [Self] {
         allSorted(Database.global.viewContext)
     }
     
     static func allSorted(_ ctx: NSManagedObjectContext) -> [Self] {
-        allSortedBy(key: \Self.objectID.description)
+        allSortedBy(key: \Self.objectID.description, ctx: ctx)
     }
     
-    static func allSortedBy<U>(key: KeyPath<Self, U>,
-                               ascending: Bool = true) -> [Self] where U: Comparable {
+    @MainActor static func allSortedBy<U>(key: KeyPath<Self, U>,
+                                          ascending: Bool = true) -> [Self] where U: Comparable {
         allSortedBy(key: key, ascending: ascending, ctx: Database.global.viewContext)
     }
     
@@ -55,8 +55,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return []
     }
     
-    static func find<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
-                                 _ value: U) -> [Self] {
+    @MainActor static func find<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
+                                            _ value: U) -> [Self] {
         find(keyPath, value, ctx: Database.global.viewContext)
     }
     
@@ -67,8 +67,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return find(predicate: predicate, ctx: ctx)
     }
     
-    static func find<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
-                                 _ value: U) -> [Self] {
+    @MainActor static func find<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
+                                            _ value: U) -> [Self] {
         find(keyPath, value, ctx: Database.global.viewContext)
     }
     
@@ -79,8 +79,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return find(predicate: predicate, ctx: ctx)
     }
     
-    static func find(_ format: String,
-                     _ args: CVarArg...) -> [Self] {
+    @MainActor static func find(_ format: String,
+                                _ args: CVarArg...) -> [Self] {
         find(ctx: Database.global.viewContext, format, args)
     }
     
@@ -91,7 +91,7 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return find(predicate: predicate, ctx: ctx)
     }
     
-    static func find(predicate: NSPredicate) -> [Self] {
+    @MainActor static func find(predicate: NSPredicate) -> [Self] {
         find(predicate: predicate, ctx: Database.global.viewContext)
     }
         
@@ -108,8 +108,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return []
     }
     
-    static func findFirst<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
-                                      _ value: U) -> Self? {
+    @MainActor static func findFirst<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
+                                                 _ value: U) -> Self? {
         findFirst(keyPath, value, ctx: Database.global.viewContext)
     }
     
@@ -120,8 +120,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return findFirst(predicate: predicate, ctx: ctx)
     }
     
-    static func findFirst<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
-                                      _ value: U) -> Self? {
+    @MainActor static func findFirst<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
+                                                 _ value: U) -> Self? {
         findFirst(keyPath, value, ctx: Database.global.viewContext)
     }
         
@@ -132,8 +132,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return findFirst(predicate: predicate, ctx: ctx)
     }
     
-    static func findFirst(_ format: String,
-                          _ args: CVarArg...) -> Self? {
+    @MainActor static func findFirst(_ format: String,
+                                     _ args: CVarArg...) -> Self? {
         findFirst(ctx: Database.global.viewContext, format, args)
     }
     
@@ -144,7 +144,7 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return findFirst(predicate: predicate, ctx: ctx)
     }
     
-    static func findFirst(predicate: NSPredicate) -> Self? {
+    @MainActor static func findFirst(predicate: NSPredicate) -> Self? {
         findFirst(predicate: predicate, ctx: Database.global.viewContext)
     }
     
@@ -162,7 +162,7 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return nil
     }
     
-    static func find(objectId: NSManagedObjectID) -> Self? {
+    @MainActor static func find(objectId: NSManagedObjectID) -> Self? {
         find(objectId: objectId, ctx: Database.global.viewContext)
     }
     
