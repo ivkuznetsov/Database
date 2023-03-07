@@ -235,7 +235,7 @@ public extension Collection where Element == NSManagedObject.Type {
     
     func objectsCountChanged(_ database: Database) -> AnyPublisher<Database.Change, Never> {
         database.objectsDidChange.filter {
-            $0.deleted.count > 0 && $0.inserted.count > 0
+            $0.deleted.count > 0 || $0.inserted.count > 0
         }.eraseToAnyPublisher()
     }
 }
