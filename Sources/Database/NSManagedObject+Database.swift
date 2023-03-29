@@ -13,8 +13,8 @@ public protocol ManagedObjectHelpers { }
 
 public extension ManagedObjectHelpers where Self: NSManagedObject {
     
-    @MainActor static func all() -> [Self] {
-        all(Database.global.viewContext)
+    @MainActor static func all(_ database: Database) -> [Self] {
+        all(database.viewContext)
     }
     
     static func all(_ ctx: NSManagedObjectContext) -> [Self] {
@@ -28,8 +28,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return []
     }
     
-    @MainActor static func allSorted() -> [Self] {
-        allSorted(Database.global.viewContext)
+    @MainActor static func allSorted(_ database: Database) -> [Self] {
+        allSorted(database.viewContext)
     }
     
     static func allSorted(_ ctx: NSManagedObjectContext) -> [Self] {
@@ -37,8 +37,9 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     }
     
     @MainActor static func allSortedBy<U>(key: KeyPath<Self, U>,
-                                          ascending: Bool = true) -> [Self] where U: Comparable {
-        allSortedBy(key: key, ascending: ascending, ctx: Database.global.viewContext)
+                                          ascending: Bool = true,
+                                          _ database: Database) -> [Self] where U: Comparable {
+        allSortedBy(key: key, ascending: ascending, ctx: database.viewContext)
     }
     
     static func allSortedBy<U>(key: KeyPath<Self, U>,
@@ -56,8 +57,9 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     }
     
     @MainActor static func find<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
-                                            _ value: U) -> [Self] {
-        find(keyPath, value, ctx: Database.global.viewContext)
+                                            _ value: U,
+                                            _ database: Database) -> [Self] {
+        find(keyPath, value, ctx: database.viewContext)
     }
     
     static func find<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
@@ -68,8 +70,9 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     }
     
     @MainActor static func find<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
-                                            _ value: U) -> [Self] {
-        find(keyPath, value, ctx: Database.global.viewContext)
+                                            _ value: U,
+                                            _ database: Database) -> [Self] {
+        find(keyPath, value, ctx: database.viewContext)
     }
     
     static func find<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
@@ -79,9 +82,10 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return find(predicate: predicate, ctx: ctx)
     }
     
-    @MainActor static func find(_ format: String,
+    @MainActor static func find(_ database: Database,
+                                _ format: String,
                                 _ args: CVarArg...) -> [Self] {
-        find(ctx: Database.global.viewContext, format, args)
+        find(ctx: database.viewContext, format, args)
     }
     
     static func find(ctx: NSManagedObjectContext,
@@ -91,8 +95,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return find(predicate: predicate, ctx: ctx)
     }
     
-    @MainActor static func find(predicate: NSPredicate) -> [Self] {
-        find(predicate: predicate, ctx: Database.global.viewContext)
+    @MainActor static func find(predicate: NSPredicate, _ database: Database) -> [Self] {
+        find(predicate: predicate, ctx: database.viewContext)
     }
         
     static func find(predicate: NSPredicate,
@@ -109,8 +113,9 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     }
     
     @MainActor static func findFirst<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
-                                                 _ value: U) -> Self? {
-        findFirst(keyPath, value, ctx: Database.global.viewContext)
+                                                 _ value: U,
+                                                 _ database: Database) -> Self? {
+        findFirst(keyPath, value, ctx: database.viewContext)
     }
     
     static func findFirst<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
@@ -121,8 +126,9 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     }
     
     @MainActor static func findFirst<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
-                                                 _ value: U) -> Self? {
-        findFirst(keyPath, value, ctx: Database.global.viewContext)
+                                                 _ value: U,
+                                                 _ database: Database) -> Self? {
+        findFirst(keyPath, value, ctx: database.viewContext)
     }
         
     static func findFirst<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
@@ -132,9 +138,10 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return findFirst(predicate: predicate, ctx: ctx)
     }
     
-    @MainActor static func findFirst(_ format: String,
+    @MainActor static func findFirst(_ database: Database,
+                                     _ format: String,
                                      _ args: CVarArg...) -> Self? {
-        findFirst(ctx: Database.global.viewContext, format, args)
+        findFirst(ctx: database.viewContext, format, args)
     }
     
     static func findFirst(ctx: NSManagedObjectContext,
@@ -144,8 +151,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return findFirst(predicate: predicate, ctx: ctx)
     }
     
-    @MainActor static func findFirst(predicate: NSPredicate) -> Self? {
-        findFirst(predicate: predicate, ctx: Database.global.viewContext)
+    @MainActor static func findFirst(predicate: NSPredicate, _ database: Database) -> Self? {
+        findFirst(predicate: predicate, ctx: database.viewContext)
     }
     
     static func findFirst(predicate: NSPredicate,
@@ -162,8 +169,8 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return nil
     }
     
-    @MainActor static func find(objectId: NSManagedObjectID) -> Self? {
-        find(objectId: objectId, ctx: Database.global.viewContext)
+    @MainActor static func find(objectId: NSManagedObjectID, _ database: Database) -> Self? {
+        find(objectId: objectId, ctx: database.viewContext)
     }
     
     static func find(objectId: NSManagedObjectID,
@@ -195,16 +202,8 @@ public extension NSManagedObject {
         return objectID
     }
     
-    static func objectsDidChange() -> AnyPublisher<Database.Change, Never> {
-        objectsDidChange(Database.global)
-    }
-    
     static func objectsDidChange(_ database: Database) -> AnyPublisher<Database.Change, Never> {
         [self].objectsDidChange(database)
-    }
-    
-    static func objectsCountChanged() -> AnyPublisher<Database.Change, Never> {
-        objectsCountChanged(Database.global)
     }
     
     static func objectsCountChanged(_ database: Database) -> AnyPublisher<Database.Change, Never> {
@@ -213,10 +212,6 @@ public extension NSManagedObject {
 }
 
 public extension Collection where Element == NSManagedObject.Type {
-    
-    func objectsDidChange() -> AnyPublisher<Database.Change, Never> {
-        objectsDidChange(Database.global)
-    }
     
     func objectsDidChange(_ database: Database) -> AnyPublisher<Database.Change, Never> {
         database.objectsDidChange.filter { change in
@@ -227,10 +222,6 @@ public extension Collection where Element == NSManagedObject.Type {
                 return false
             })
         }.eraseToAnyPublisher()
-    }
-    
-    func objectsCountChanged() -> AnyPublisher<Database.Change, Never> {
-        objectsCountChanged(Database.global)
     }
     
     func objectsCountChanged(_ database: Database) -> AnyPublisher<Database.Change, Never> {

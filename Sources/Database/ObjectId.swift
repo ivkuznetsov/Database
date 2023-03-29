@@ -24,8 +24,8 @@ public struct ObjectId<T: NSManagedObject>: Hashable {
         hasher.combine(objectId)
     }
     
-    @MainActor public func object() -> T? {
-        object(Database.global.viewContext)
+    @MainActor public func object(_ database: Database) -> T? {
+        object(database.viewContext)
     }
     
     public func object(_ ctx: NSManagedObjectContext) -> T? {
@@ -35,8 +35,8 @@ public struct ObjectId<T: NSManagedObject>: Hashable {
 
 public extension Sequence {
     
-    @MainActor func objects<U: NSManagedObject>() -> [U] where Element == ObjectId<U> {
-        objects(Database.global.viewContext)
+    @MainActor func objects<U: NSManagedObject>(_ database: Database) -> [U] where Element == ObjectId<U> {
+        objects(database.viewContext)
     }
     
     func objects<U: NSManagedObject>(_ ctx: NSManagedObjectContext) -> [U] where Element == ObjectId<U> {

@@ -10,19 +10,6 @@ import Combine
 
 public class Database {
     
-    @RWAtomic  private static var internalGlobal: Database?
-    
-    static var global: Database {
-        if let global = internalGlobal {
-            return global
-        }
-        fatalError("You need to set global Database by Databae.setup(global:)")
-    }
-    
-    public static func setup(global: Database) {
-        internalGlobal = global
-    }
-    
     private let serialTask = SerialTasks()
     private let container: NSPersistentCloudKitContainer
     

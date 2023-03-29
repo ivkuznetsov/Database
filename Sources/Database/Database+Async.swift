@@ -44,79 +44,7 @@ public extension NSManagedObject {
     }
 }
 
-public extension ObjectId {
-    
-    func edit<R>(_ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await edit(Database.global, closure)
-    }
-    
-    func edit<R>(_ database: Database, _ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await database.edit { ctx in
-            if let object = object(ctx) {
-                return try closure(object, ctx)
-            } else {
-                throw RunError.cancelled
-            }
-        }
-    }
-    
-    func fetch<R>(_ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await fetch(Database.global, closure)
-    }
-    
-    func fetch<R>(_ database: Database, _ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await database.fetch { ctx in
-            if let object = object(ctx) {
-                return try closure(object, ctx)
-            } else {
-                throw RunError.cancelled
-            }
-        }
-    }
-}
-
-public extension ManagedObjectHelpers where Self: NSManagedObject {
-    
-    func edit<R>(_ closure: @escaping (Self, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await edit(Database.global, closure)
-    }
-    
-    func edit<R>(_ database: Database, _ closure: @escaping (Self, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await getObjectId.edit(database, closure)
-    }
-    
-    func fetch<R>(_ closure: @escaping (Self, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await fetch(Database.global, closure)
-    }
-    
-    func fetch<R>(_ database: Database, _ closure: @escaping (Self, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await getObjectId.fetch(database, closure)
-    }
-}
-
-public extension Sequence where Element: NSManagedObject {
-    
-    func edit<R>(_ closure: @escaping ([Element], _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await edit(Database.global, closure)
-    }
-    
-    func edit<R>(_ database: Database, _ closure: @escaping ([Element], _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        let ids = self.ids
-        return try await database.edit {
-            try closure(ids.objects($0), $0)
-        }
-    }
-}
-
 public extension Database {
-    
-    static func edit<R>(_ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await Database.global.edit(closure)
-    }
-    
-    static func edit<R>(_ database: Database, _ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await database.edit(closure)
-    }
     
     func edit<R>(_ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
         try await onEdit {
@@ -143,12 +71,39 @@ public extension Database {
         }
     }
     
-    static func fetch<R>(_ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await Database.global.fetch(closure)
+    func edit<T, R>(_ objectId: ObjectId<T>, _ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        try await edit { ctx in
+            if let object = objectId.object(ctx) {
+                return try closure(object, ctx)
+            } else {
+                throw RunError.cancelled
+            }
+        }
     }
     
-    static func fetch<R>(_ database: Database, _ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await database.fetch(closure)
+    func edit<T: NSManagedObject, R>(_ object: T, _ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        try await edit(object.getObjectId, closure)
+    }
+    
+    func edit<T: NSManagedObject, R>(_ objects: [T], _ closure: @escaping ([T], _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        let ids = objects.ids
+        return try await edit {
+            try closure(ids.objects($0), $0)
+        }
+    }
+    
+    func edit<T1, T2, R>(_ objectId1: ObjectId<T1>, _ objectId2: ObjectId<T2>, _ closure: @escaping (T1, T2, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        try await edit { ctx in
+            if let object1 = objectId1.object(ctx), let object2 = objectId2.object(ctx) {
+                return try closure(object1, object2, ctx)
+            } else {
+                throw RunError.cancelled
+            }
+        }
+    }
+    
+    func edit<T1: NSManagedObject, T2: NSManagedObject, R>(_ object1: T1, _ object2: T2, _ closure: @escaping (T1, T2, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        try await edit(object1.getObjectId, object2.getObjectId, closure)
     }
     
     func fetch<R>(_ closure: @escaping (_ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
@@ -172,40 +127,24 @@ public extension Database {
             }
         }
     }
-}
-
-public struct Couple<First: NSManagedObject, Second: NSManagedObject> {
     
-    fileprivate let first: ObjectId<First>
-    fileprivate let second: ObjectId<Second>
-    
-    public init(_ first: First, _ second: Second) {
-        self.first = first.getObjectId
-        self.second = second.getObjectId
+    func fetch<T, R>(_ objectId: ObjectId<T>, _ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        try await fetch { ctx in
+            if let object = objectId.object(ctx) {
+                return try closure(object, ctx)
+            } else {
+                throw RunError.cancelled
+            }
+        }
     }
     
-    public init(_ first: ObjectId<First>, _ second: ObjectId<Second>) {
-        self.first = first
-        self.second = second
+    func fetch<T: NSManagedObject, R>(_ object: T, _ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        try await fetch(object.getObjectId, closure)
     }
     
-    public init(_ first: First, _ second: ObjectId<Second>) {
-        self.first = first.getObjectId
-        self.second = second
-    }
-    
-    public init(_ first: ObjectId<First>, _ second: Second) {
-        self.first = first
-        self.second = second.getObjectId
-    }
-    
-    public func edit<R>(_ closure: @escaping (First, Second, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await edit(Database.global, closure)
-    }
-    
-    public func edit<R>(_ database: Database, _ closure: @escaping (First, Second, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await database.edit { ctx in
-            if let object1 = first.object(ctx), let object2 = second.object(ctx) {
+    func fetch<T1, T2, R>(_ objectId1: ObjectId<T1>, _ objectId2: ObjectId<T2>, _ closure: @escaping (T1, T2, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        try await fetch { ctx in
+            if let object1 = objectId1.object(ctx), let object2 = objectId2.object(ctx) {
                 return try closure(object1, object2, ctx)
             } else {
                 throw RunError.cancelled
@@ -213,17 +152,7 @@ public struct Couple<First: NSManagedObject, Second: NSManagedObject> {
         }
     }
     
-    public func fetch<R>(_ closure: @escaping (First, Second, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await fetch(Database.global, closure)
-    }
-    
-    public func fetch<R>(_ database: Database, _ closure: @escaping (First, Second, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        try await database.fetch { ctx in
-            if let object1 = first.object(ctx), let object2 = second.object(ctx) {
-                return try closure(object1, object2, ctx)
-            } else {
-                throw RunError.cancelled
-            }
-        }
+    func fetch<T1: NSManagedObject, T2: NSManagedObject, R>(_ object1: T1, _ object2: T2, _ closure: @escaping (T1, T2, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+        try await fetch(object1.getObjectId, object2.getObjectId, closure)
     }
 }
