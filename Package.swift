@@ -13,7 +13,7 @@ let package = Package(
         .library(name: "Database", targets: ["Database"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ivkuznetsov/CommonUtils.git", branch: "main")
+        .package(url: "https://github.com/ivkuznetsov/CommonUtils.git", from: .init(1, 0, 1))
     ],
     targets: [
         .target(name: "Database", dependencies: ["CommonUtils"])
