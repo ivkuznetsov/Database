@@ -57,13 +57,13 @@ public extension NSPersistentStoreDescription {
         ProcessInfo.processInfo.processName.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) + ".sqlite"
     }
     
-    func copyStoreFileFrom(url: URL) throws {
+    final func copyStoreFileFrom(url: URL) throws {
         if FileManager.default.fileExists(atPath: url.path), let currentUrl = self.url {
             try FileManager.default.copyItem(at: url, to: currentUrl)
         }
     }
     
-    func removeStoreFiles() {
+    final func removeStoreFiles() {
         guard let url = url else { return }
         
         let databaseDirectory = url.deletingLastPathComponent()

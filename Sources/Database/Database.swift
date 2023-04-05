@@ -8,7 +8,7 @@ import CommonUtils
 import os.log
 import Combine
 
-public class Database {
+public final class Database {
     
     private let serialTask = SerialTasks()
     private let container: NSPersistentCloudKitContainer
