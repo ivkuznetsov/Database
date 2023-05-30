@@ -11,7 +11,21 @@ extension NSManagedObject: ManagedObjectHelpers { }
 
 public protocol ManagedObjectHelpers { }
 
+public struct Change<T: NSManagedObject> {
+    public let inserted: Set<ObjectId<T>>
+    public let updated: Set<ObjectId<T>>
+    public let deleted: Set<ObjectId<T>>
+}
+
 public extension ManagedObjectHelpers where Self: NSManagedObject {
+    
+    static func didChange(_ database: Database) -> AnyPublisher<Change<Self>, Never> {
+        objectsDidChange(database).map {
+            Change(inserted: Set($0.inserted.map { ObjectId<Self>($0) }),
+                   updated: Set($0.updated.map { ObjectId<Self>($0) }),
+                   deleted: Set($0.deleted.map { ObjectId<Self>($0) }))
+        }.eraseToAnyPublisher()
+    }
     
     @MainActor static func all(_ database: Database) -> [Self] {
         all(database.viewContext)

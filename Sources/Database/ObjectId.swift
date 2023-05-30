@@ -20,6 +20,10 @@ public struct ObjectId<T: NSManagedObject>: Hashable {
         objectId = object.permanentObjectID
     }
     
+    init(_ objectId: NSManagedObjectID) {
+        self.objectId = objectId
+    }
+    
     public func hash(into hasher: inout Hasher) {
         hasher.combine(objectId)
     }
