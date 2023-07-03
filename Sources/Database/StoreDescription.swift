@@ -5,6 +5,7 @@
 import Foundation
 import CoreData
 import CommonUtils
+import CloudKit
 
 public extension NSPersistentStoreDescription {
     
@@ -27,6 +28,30 @@ public extension NSPersistentStoreDescription {
                     setup: setup)
     }
     
+    static func cloudWithShare(_ name: String,
+                               identifier: String,
+                               setup: (_ cloud: NSPersistentStoreDescription,
+                                       _ share: NSPersistentStoreDescription)->() = { _, _ in }) -> [NSPersistentStoreDescription] {
+        let privatePath = FileManager.applicationSupportDirectory + "/" + name + databaseFileName
+        let sharedPath = FileManager.applicationSupportDirectory + "/shared" + name + databaseFileName
+        
+        let privateDescription = self.description(.cloud(name: name, identifier: identifier), url: URL(fileURLWithPath: privatePath), setup: { _ in })
+        
+        privateDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+        privateDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+        
+        let sharedDescription = privateDescription.copy() as! NSPersistentStoreDescription
+        sharedDescription.url = URL(fileURLWithPath: sharedPath)
+        
+        setup(privateDescription, sharedDescription)
+        
+        let sharedStoreOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: identifier)
+        sharedStoreOptions.databaseScope = .shared
+        sharedDescription.cloudKitContainerOptions = sharedStoreOptions
+        
+        return [privateDescription, sharedDescription]
+    }
+    
     static func transientStore(_ configuration: Configuration? = nil,
                                setup: (NSPersistentStoreDescription)->() = { _ in }) -> NSPersistentStoreDescription {
         
@@ -45,7 +70,6 @@ public extension NSPersistentStoreDescription {
         if case .cloud(_, let identifier) = configuration {
             store.cloudKitContainerOptions = .init(containerIdentifier: identifier)
         }
-        store.shouldMigrateStoreAutomatically = true
         store.shouldMigrateStoreAutomatically = true
         
         setup(store)
