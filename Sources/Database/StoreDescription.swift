@@ -20,11 +20,20 @@ public extension NSPersistentStoreDescription {
         }
     }
     
+    @available(*, deprecated, message: "Use localData(), data file has been renamed")
     static func dataStore(_ configuration: Configuration? = nil,
                           setup: (NSPersistentStoreDescription)->() = { _ in }) -> NSPersistentStoreDescription {
         
         description(configuration,
                     url: URL(fileURLWithPath: FileManager.applicationSupportDirectory + "/" + databaseFileName + (configuration?.name ?? "")),
+                    setup: setup)
+    }
+    
+    static func localData(_ configuration: Configuration? = nil,
+                          setup: (NSPersistentStoreDescription)->() = { _ in }) -> NSPersistentStoreDescription {
+        
+        description(configuration,
+                    url: URL(fileURLWithPath: FileManager.applicationSupportDirectory + "/" + (configuration?.name ?? "") + databaseFileName),
                     setup: setup)
     }
     
