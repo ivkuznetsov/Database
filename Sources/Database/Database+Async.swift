@@ -71,6 +71,27 @@ public extension Database {
         }
     }
     
+    func edit<R>(_ closure: @escaping (_ ctx: NSManagedObjectContext) -> R) async -> R {
+        try! await onEdit {
+            let context = self.createPrivateContext()
+            if #available(iOS 15, macOS 12, *) {
+                return await context.perform {
+                    let result = closure(context)
+                    context.saveAll()
+                    return result
+                }
+            } else {
+                return await withCheckedContinuation { continuation in
+                    context.perform {
+                        let result = closure(context)
+                        context.saveAll()
+                        continuation.resume(with: .success(result))
+                    }
+                }
+            }
+        }
+    }
+    
     func edit<T, R>(_ objectId: ObjectId<T>, _ closure: @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
         try await edit { ctx in
             if let object = objectId.object(ctx) {
@@ -123,6 +144,24 @@ public extension Database {
                     } catch {
                         continuation.resume(with: .failure(error))
                     }
+                }
+            }
+        }
+    }
+    
+    func fetch<R>(_ closure: @escaping (_ ctx: NSManagedObjectContext) -> R) async -> R {
+        let context = createPrivateContext()
+        
+        if #available(iOS 15, macOS 12, *) {
+            return await context.perform {
+                closure(context)
+            }
+        } else {
+            return await withCheckedContinuation { continuation in
+                context.perform {
+                    let result = closure(context)
+                    context.saveAll()
+                    continuation.resume(with: .success(result))
                 }
             }
         }
