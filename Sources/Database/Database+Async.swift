@@ -6,7 +6,6 @@
 //
 
 import CoreData
-import CommonUtils
 
 public protocol ValueOnMoc { }
 
@@ -40,7 +39,7 @@ public extension NSManagedObject {
                 }
             }
         }
-        throw RunError.cancelled
+        throw CancellationError()
     }
 }
 
@@ -97,7 +96,7 @@ public extension Database {
             if let object = objectId.object(ctx) {
                 return try closure(object, ctx)
             } else {
-                throw RunError.cancelled
+                throw CancellationError()
             }
         }
     }
@@ -118,7 +117,7 @@ public extension Database {
             if let object1 = objectId1.object(ctx), let object2 = objectId2.object(ctx) {
                 return try closure(object1, object2, ctx)
             } else {
-                throw RunError.cancelled
+                throw CancellationError()
             }
         }
     }
@@ -172,7 +171,7 @@ public extension Database {
             if let object = objectId.object(ctx) {
                 return try closure(object, ctx)
             } else {
-                throw RunError.cancelled
+                throw CancellationError()
             }
         }
     }
@@ -186,7 +185,7 @@ public extension Database {
             if let object1 = objectId1.object(ctx), let object2 = objectId2.object(ctx) {
                 return try closure(object1, object2, ctx)
             } else {
-                throw RunError.cancelled
+                throw CancellationError()
             }
         }
     }

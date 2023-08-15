@@ -4,14 +4,26 @@
 
 import Foundation
 import CoreData
-import CommonUtils
 import os.log
 import Combine
 import CloudKit
 
 public final class Database {
     
-    private let serialTask = SerialTasks()
+    private actor TaskSync {
+        
+        private var task: Task<Any, Error>?
+        
+        public func run<Success>(_ block: @Sendable @escaping () async throws -> Success) async throws -> Success {
+            task = Task { [task] in
+                _ = await task?.result
+                return try await block() as Any
+            }
+            return try await task!.value as! Success
+        }
+    }
+    
+    private let editSync = TaskSync()
     private let historyQueue = DispatchQueue(label: "database.history")
     public let container: NSPersistentCloudKitContainer
     
@@ -47,18 +59,26 @@ public final class Database {
     }
     
     private func historyToken(with storeUUID: String) -> NSPersistentHistoryToken? {
-        let key = "HistoryToken" + storeUUID
-        if let data = UserDefaults.standard.data(forKey: key) {
-            return  try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSPersistentHistoryToken.self, from: data)
+        if let data = UserDefaults.standard.data(forKey: "HistoryToken" + storeUUID) {
+            return try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSPersistentHistoryToken.self, from: data)
         }
         return nil
     }
     
     private func updateHistoryToken(with storeUUID: String, newToken: NSPersistentHistoryToken) {
-        let key = "HistoryToken" + storeUUID
         let data = try? NSKeyedArchiver.archivedData(withRootObject: newToken, requiringSecureCoding: true)
-        UserDefaults.standard.set(data, forKey: key)
+        UserDefaults.standard.set(data, forKey: "HistoryToken" + storeUUID)
     }
+    
+    public struct Change {
+        public let classes: Set<String>
+        public let inserted: Set<NSManagedObjectID>
+        public let updated: Set<NSManagedObjectID>
+        public let deleted: Set<NSManagedObjectID>
+    }
+    
+    public let objectsDidChange = PassthroughSubject<Change, Never>()
+    public let sharePublisher = PassthroughSubject<Void, Never>()
     
     private func didRemoteChange(notification: Notification) {
         guard let storeUUID = notification.userInfo?[NSStoreUUIDKey] as? String,
@@ -75,9 +95,7 @@ public final class Database {
                 try self.historyQueue.sync {
                     let lastHistoryToken = self.historyToken(with: storeUUID)
                     let request = NSPersistentHistoryChangeRequest.fetchHistory(after: lastHistoryToken)
-                    let historyFetchRequest = NSPersistentHistoryTransaction.fetchRequest!
-                    //historyFetchRequest.predicate = NSPredicate(format: "author != %@", "app")
-                    request.fetchRequest = historyFetchRequest
+                    request.fetchRequest = NSPersistentHistoryTransaction.fetchRequest
 
                     if privateStore.identifier == storeUUID {
                         request.affectedStores = [privateStore]
@@ -90,15 +108,15 @@ public final class Database {
                         return
                     }
                     
-                    if let newToken = transactions.last?.token {
-                        self.updateHistoryToken(with: storeUUID, newToken: newToken)
-                    }
-                    
                     if transactions.isEmpty { // when transaction is empty it looks like CKShare is changed
                         DispatchQueue.onMain {
                             self.sharePublisher.send()
                         }
                     } else {
+                        if let newToken = transactions.last?.token {
+                            self.updateHistoryToken(with: storeUUID, newToken: newToken)
+                        }
+                        
                         var classes = Set<String>()
                         var inserted = Set<NSManagedObjectID>()
                         var updated = Set<NSManagedObjectID>()
@@ -134,7 +152,7 @@ public final class Database {
                         
                         if classes.count > 0 {
                             DispatchQueue.onMain {
-                                self.objectsPublisher.send(Change(classes: classes,
+                                self.objectsDidChange.send(Change(classes: classes,
                                                                   inserted: inserted,
                                                                   updated: updated,
                                                                   deleted: deleted))
@@ -145,18 +163,6 @@ public final class Database {
             }
         }
     }
-    
-    public struct Change {
-        public let classes: Set<String>
-        public let inserted: Set<NSManagedObjectID>
-        public let updated: Set<NSManagedObjectID>
-        public let deleted: Set<NSManagedObjectID>
-    }
-    
-    private let objectsPublisher = PassthroughSubject<Change, Never>()
-    public var objectsDidChange: AnyPublisher<Change, Never> { objectsPublisher.eraseToAnyPublisher() }
-    
-    public let sharePublisher = VoidPublisher()
     
     private func didMerge(_ notification: Notification) {
         if let context = notification.object as? NSManagedObjectContext,
@@ -183,7 +189,7 @@ public final class Database {
             let deleted = extract("deleted_objectIDs")
             
             if classes.count > 0 {
-                objectsPublisher.send(Change(classes: classes,
+                objectsDidChange.send(Change(classes: classes,
                                              inserted: inserted,
                                              updated: updated,
                                              deleted: deleted))
@@ -221,14 +227,9 @@ public final class Database {
     }
     
     public var sharedStore: NSPersistentStore? {
-        let description = container.persistentStoreDescriptions.first {
-            if let options = $0.cloudKitContainerOptions {
-                return options.databaseScope == .shared
-            }
-            return false
-        }
-        
-        if let url = description?.url {
+        if let url = container.persistentStoreDescriptions.first(where: {
+            $0.cloudKitContainerOptions?.databaseScope == .shared
+        })?.url {
             return container.persistentStoreCoordinator.persistentStore(for: url)
         }
         return nil
@@ -236,7 +237,7 @@ public final class Database {
     
     @discardableResult
     func onEdit<T>(_ closure: @escaping () async throws ->T) async throws -> T {
-        try await serialTask.run {
+        try await editSync.run {
             try await closure()
         }
     }
@@ -256,5 +257,16 @@ public final class Database {
     
     public func createPrivateContext() -> NSManagedObjectContext {
         createPrivateContext(mergeChanges: false)
+    }
+}
+
+extension DispatchQueue {
+    
+    static func onMain(_ closure: @escaping ()->()) {
+        if Thread.isMainThread {
+            closure()
+        } else {
+            main.async(execute: closure)
+        }
     }
 }

@@ -8,7 +8,6 @@
 import Foundation
 import CoreData
 import CloudKit
-import CommonUtils
 
 extension CKShare: @unchecked Sendable { }
 
@@ -83,9 +82,7 @@ public extension Database {
     }
     
     func accept(_ metadata: CKShare.Metadata) async throws {
-        guard let sharedStore = sharedStore else { throw RunError.custom("Please setup iCloud account") }
-        
-        try await container.acceptShareInvitations(from: [metadata], into: sharedStore)
+        try await container.acceptShareInvitations(from: [metadata], into: sharedStore!)
     }
     
     private func persistentStoreForShare(with shareRecordID: CKRecord.ID) -> NSPersistentStore? {

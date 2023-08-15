@@ -4,7 +4,6 @@
 
 import Foundation
 import CoreData
-import CommonUtils
 import CloudKit
 
 public extension NSPersistentStoreDescription {

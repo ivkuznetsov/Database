@@ -12,10 +12,8 @@ let package = Package(
     products: [
         .library(name: "Database", targets: ["Database"])
     ],
-    dependencies: [
-        .package(url: "https://github.com/ivkuznetsov/CommonUtils.git", from: .init(1, 0, 1))
-    ],
+    dependencies: [],
     targets: [
-        .target(name: "Database", dependencies: ["CommonUtils"])
+        .target(name: "Database", dependencies: [])
     ]
 )
