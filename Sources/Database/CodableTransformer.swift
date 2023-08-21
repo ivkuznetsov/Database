@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import CommonUtils
 
 public class CodableTransformer: ValueTransformer {
     
@@ -70,5 +69,26 @@ public class CodableTransformer: ValueTransformer {
     public override func transformedValue(_ value: Any?) -> Any? {
         guard let value = value, let encodingValue = Value(value: value) else { return nil }
         return try! encodingValue.toData()
+    }
+}
+
+public extension Encodable {
+    
+    func toData(_ encoder: JSONEncoder = JSONEncoder()) throws -> Data {
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(self)
+    }
+}
+
+public extension Decodable {
+    
+    static func decode(_ data: Data, decoder: JSONDecoder = JSONDecoder()) throws -> Self {
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(self, from: data)
+    }
+    
+    static func decode(_ dict: [String : Any]) throws -> Self {
+        let data = try Foundation.JSONSerialization.data(withJSONObject: dict, options: [])
+        return try decode(data)
     }
 }

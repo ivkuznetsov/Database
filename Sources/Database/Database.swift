@@ -30,6 +30,8 @@ public final class Database {
     public var viewContext: NSManagedObjectContext { container.viewContext }
     public let writerContext: NSManagedObjectContext
     
+    private var observers: [AnyCancellable] = []
+    
     public init(storeDescriptions: [NSPersistentStoreDescription] = [.dataStore()],
                 modelBundle: Bundle = Bundle.main) {
         
@@ -48,11 +50,11 @@ public final class Database {
         if storeDescriptions.contains(where: { $0.options[NSPersistentHistoryTrackingKey] as? NSNumber == true }) {
             NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange).sink { [weak self] in
                 self?.didRemoteChange(notification: $0)
-            }.retained(by: self)
+            }.store(in: &observers)
         } else {
             NotificationCenter.default.publisher(for: NSManagedObjectContext.didMergeChangesObjectIDsNotification).sink { [weak self] in
                 self?.didMerge($0)
-            }.retained(by: self)
+            }.store(in: &observers)
         }
         
         setup()

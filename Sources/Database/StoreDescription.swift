@@ -24,7 +24,7 @@ public extension NSPersistentStoreDescription {
                           setup: (NSPersistentStoreDescription)->() = { _ in }) -> NSPersistentStoreDescription {
         
         description(configuration,
-                    url: URL(fileURLWithPath: FileManager.applicationSupportDirectory + "/" + databaseFileName + (configuration?.name ?? "")),
+                    url: URL(fileURLWithPath: applicationSupportDirectory + "/" + databaseFileName + (configuration?.name ?? "")),
                     setup: setup)
     }
     
@@ -32,7 +32,7 @@ public extension NSPersistentStoreDescription {
                           setup: (NSPersistentStoreDescription)->() = { _ in }) -> NSPersistentStoreDescription {
         
         description(configuration,
-                    url: URL(fileURLWithPath: FileManager.applicationSupportDirectory + "/" + (configuration?.name ?? "") + databaseFileName),
+                    url: URL(fileURLWithPath: applicationSupportDirectory + "/" + (configuration?.name ?? "") + databaseFileName),
                     setup: setup)
     }
     
@@ -40,8 +40,8 @@ public extension NSPersistentStoreDescription {
                                identifier: String,
                                setup: (_ cloud: NSPersistentStoreDescription,
                                        _ share: NSPersistentStoreDescription)->() = { _, _ in }) -> [NSPersistentStoreDescription] {
-        let privatePath = FileManager.applicationSupportDirectory + "/" + name + databaseFileName
-        let sharedPath = FileManager.applicationSupportDirectory + "/shared" + name + databaseFileName
+        let privatePath = applicationSupportDirectory + "/" + name + databaseFileName
+        let sharedPath = applicationSupportDirectory + "/shared" + name + databaseFileName
         
         let privateDescription = self.description(.cloud(name: name, identifier: identifier), url: URL(fileURLWithPath: privatePath), setup: { _ in })
         
@@ -107,5 +107,14 @@ public extension NSPersistentStoreDescription {
                 }
             }
         }
+    }
+    
+    static var applicationSupportDirectory: String {
+        let dir = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true)[0] + "/" + Bundle.main.bundleIdentifier!
+        
+        if !FileManager.default.fileExists(atPath: dir) {
+            try! FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
+        }
+        return dir
     }
 }
