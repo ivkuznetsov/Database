@@ -137,9 +137,7 @@ public extension Database {
             return try await withCheckedThrowingContinuation { continuation in
                 context.perform {
                     do {
-                        let result = try closure(context)
-                        context.saveAll()
-                        continuation.resume(with: .success(result))
+                        continuation.resume(with: .success(try closure(context)))
                     } catch {
                         continuation.resume(with: .failure(error))
                     }
@@ -158,9 +156,7 @@ public extension Database {
         } else {
             return await withCheckedContinuation { continuation in
                 context.perform {
-                    let result = closure(context)
-                    context.saveAll()
-                    continuation.resume(with: .success(result))
+                    continuation.resume(with: .success(closure(context)))
                 }
             }
         }
