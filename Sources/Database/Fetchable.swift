@@ -8,17 +8,17 @@ import CoreData
 public protocol Fetchable {
     
     var uid: String? { get set }
-    func update(_ dict: [AnyHashable : Any])
+    func update(_ dict: [String : Any])
 }
 
 public protocol CustomId {
     
-    static func id(from dict: [AnyHashable : Any]) -> String
+    static func id(from dict: [String : Any]) -> String
 }
 
 public extension Fetchable {
     
-    func parse<U>(_ dict: [AnyHashable : Any], _ keys: [(dbKey: ReferenceWritableKeyPath<Self, U?>, serviceKey: String)], dateConverted: ((String)->(Date?))? = nil) {
+    func parse<U>(_ dict: [String : Any], _ keys: [(dbKey: ReferenceWritableKeyPath<Self, U?>, serviceKey: String)], dateConverted: ((String)->(Date?))? = nil) {
         for key in keys {
             if let value = dict[key.serviceKey] {
                 if let value = value as? U {
@@ -32,7 +32,7 @@ public extension Fetchable {
         }
     }
     
-    func parse<U>(_ dict: [AnyHashable : Any], _ keys: [(dbKey: ReferenceWritableKeyPath<Self, U>, serviceKey: String)]) {
+    func parse<U>(_ dict: [String : Any], _ keys: [(dbKey: ReferenceWritableKeyPath<Self, U>, serviceKey: String)]) {
         for key in keys {
             if let value = dict[key.serviceKey] {
                 if let value = value as? U {
@@ -52,7 +52,7 @@ public extension Fetchable {
         }
     }
     
-    static func id(serviceObject: [AnyHashable : Any]) -> String? {
+    static func id(serviceObject: [String : Any]) -> String? {
         if let item = self as? CustomId.Type {
             return item.id(from: serviceObject)
         }
@@ -107,6 +107,8 @@ public extension Fetchable where Self: NSManagedObject {
                !resultSet.contains(object.uid!) {
                 resultSet.insert(object.uid!)
                 result.append(object)
+                
+                additional?(object, serviceObject)
             }
         }
         return result
