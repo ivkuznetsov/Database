@@ -17,6 +17,47 @@ public struct Change<T: NSManagedObject> {
     public let deleted: Set<ObjectId<T>>
 }
 
+extension KeyPath {
+    
+    var asString: String? {
+        if let path = _kvcKeyPathString {
+            return path
+        }
+        return String(describing: self).components(separatedBy: ".").last
+    }
+}
+
+public protocol AsCVarArg {
+    
+    var cVarArg: CVarArg { get }
+}
+
+extension UUID: AsCVarArg {
+    
+    public var cVarArg: CVarArg { self as CVarArg }
+}
+
+extension NSPredicate {
+    
+    private static func with<U>(keyString: String, value: U) -> NSPredicate {
+        if let value = value as? AsCVarArg {
+            return NSPredicate(format: "\(keyString) == %@", value.cVarArg)
+        } else if let value = value as? CVarArg {
+            return NSPredicate(format: "\(keyString) == %@", value)
+        } else {
+            fatalError("Please add support of AsCVarArg to your value type: \(type(of: value))")
+        }
+    }
+    
+    static func with<Fetchable, U>(_ keyPath: KeyPath<Fetchable, U>, _ value: U) -> NSPredicate {
+        with(keyString: keyPath.asString!, value: value)
+    }
+    
+    static func with<Fetchable, U>(_ keyPath: KeyPath<Fetchable, U?>, _ value: U) -> NSPredicate {
+        with(keyString: keyPath.asString!, value: value)
+    }
+}
+
 public extension ManagedObjectHelpers where Self: NSManagedObject {
     
     static func didChange(_ database: Database) -> AnyPublisher<Change<Self>, Never> {
@@ -70,30 +111,28 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return []
     }
     
-    @MainActor static func find<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
-                                            _ value: U,
-                                            _ database: Database) -> [Self] {
+    @MainActor static func find<U>(_ keyPath: KeyPath<Self, U>,
+                                   _ value: U,
+                                   _ database: Database) -> [Self] {
         find(keyPath, value, ctx: database.viewContext)
     }
     
-    static func find<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
-                                 _ value: U,
-                                 ctx: NSManagedObjectContext) -> [Self] {
-        let predicate = NSPredicate(format: (value as? String == nil) ? "\(keyPath._kvcKeyPathString!) == \(value)" : "\(keyPath._kvcKeyPathString!) == \"\(value)\"")
-        return find(predicate: predicate, ctx: ctx)
+    static func find<U>(_ keyPath: KeyPath<Self, U>,
+                        _ value: U,
+                        ctx: NSManagedObjectContext) -> [Self] {
+        find(predicate: .with(keyPath, value), ctx: ctx)
     }
     
-    @MainActor static func find<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
-                                            _ value: U,
-                                            _ database: Database) -> [Self] {
+    @MainActor static func find<U>(_ keyPath: KeyPath<Self, U?>,
+                                   _ value: U,
+                                   _ database: Database) -> [Self] {
         find(keyPath, value, ctx: database.viewContext)
     }
     
-    static func find<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
-                                 _ value: U,
-                                 ctx: NSManagedObjectContext) -> [Self] {
-        let predicate = NSPredicate(format: (value as? String == nil) ? "\(keyPath._kvcKeyPathString!) == \(value)" : "\(keyPath._kvcKeyPathString!) == \"\(value)\"")
-        return find(predicate: predicate, ctx: ctx)
+    static func find<U>(_ keyPath: KeyPath<Self, U?>,
+                        _ value: U,
+                        ctx: NSManagedObjectContext) -> [Self] {
+        find(predicate: .with(keyPath, value), ctx: ctx)
     }
     
     @MainActor static func find(_ database: Database,
@@ -126,30 +165,28 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         return []
     }
     
-    @MainActor static func findFirst<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
-                                                 _ value: U,
-                                                 _ database: Database) -> Self? {
+    @MainActor static func findFirst<U>(_ keyPath: KeyPath<Self, U>,
+                                        _ value: U,
+                                        _ database: Database) -> Self? {
         findFirst(keyPath, value, ctx: database.viewContext)
     }
     
-    static func findFirst<U: CVarArg>(_ keyPath: KeyPath<Self, U>,
-                                      _ value: U,
-                                      ctx: NSManagedObjectContext) -> Self? {
-        let predicate = NSPredicate(format: (value as? String == nil) ? "\(keyPath._kvcKeyPathString!) == \(value)" : "\(keyPath._kvcKeyPathString!) == \"\(value)\"")
-        return findFirst(predicate: predicate, ctx: ctx)
+    static func findFirst<U>(_ keyPath: KeyPath<Self, U>,
+                             _ value: U,
+                             ctx: NSManagedObjectContext) -> Self? {
+        findFirst(predicate: .with(keyPath, value), ctx: ctx)
     }
     
-    @MainActor static func findFirst<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
-                                                 _ value: U,
-                                                 _ database: Database) -> Self? {
+    @MainActor static func findFirst<U>(_ keyPath: KeyPath<Self, U?>,
+                                        _ value: U,
+                                        _ database: Database) -> Self? {
         findFirst(keyPath, value, ctx: database.viewContext)
     }
         
-    static func findFirst<U: CVarArg>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
-                                      _ value: U,
-                                      ctx: NSManagedObjectContext) -> Self? {
-        let predicate = NSPredicate(format: (value as? String == nil) ? "\(keyPath._kvcKeyPathString!) == \(value)" : "\(keyPath._kvcKeyPathString!) == \"\(value)\"")
-        return findFirst(predicate: predicate, ctx: ctx)
+    static func findFirst<U>(_ keyPath: KeyPath<Self, U?>,
+                             _ value: U,
+                             ctx: NSManagedObjectContext) -> Self? {
+        findFirst(predicate: .with(keyPath, value), ctx: ctx)
     }
     
     @MainActor static func findFirst(_ database: Database,

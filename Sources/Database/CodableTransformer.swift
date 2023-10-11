@@ -72,7 +72,7 @@ public class CodableTransformer: ValueTransformer {
     }
 }
 
-public extension Encodable {
+private extension Encodable {
     
     func toData(_ encoder: JSONEncoder = JSONEncoder()) throws -> Data {
         encoder.dateEncodingStrategy = .iso8601
@@ -80,7 +80,7 @@ public extension Encodable {
     }
 }
 
-public extension Decodable {
+private extension Decodable {
     
     static func decode(_ data: Data, decoder: JSONDecoder = JSONDecoder()) throws -> Self {
         decoder.dateDecodingStrategy = .iso8601

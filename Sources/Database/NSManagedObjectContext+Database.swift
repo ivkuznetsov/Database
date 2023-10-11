@@ -19,11 +19,11 @@ public extension NSManagedObjectContext {
         return try fetch(request)
     }
     
-    private static var ignoreMergeKey = "ignoreMerge"
+    private static var ignoreMergeKey = 0
     
     internal var ignoreMerge: Bool {
-        get { objc_getAssociatedObject(self, &NSManagedObjectContext.ignoreMergeKey) as? Bool ?? false }
-        set { objc_setAssociatedObject(self, &NSManagedObjectContext.ignoreMergeKey, newValue, .OBJC_ASSOCIATION_RETAIN) }
+        get { objc_getAssociatedObject(self, &Self.ignoreMergeKey) as? Bool ?? false }
+        set { objc_setAssociatedObject(self, &Self.ignoreMergeKey, newValue, .OBJC_ASSOCIATION_RETAIN) }
     }
     
     func saveAll() {
