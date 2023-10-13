@@ -123,7 +123,7 @@ public extension Fetchable where Self: NSManagedObject {
     static func findOrCreatePlaceholder(uid: Id, ctx: NSManagedObjectContext) -> Self {
         var object: Self
         
-        if let found = findFirst(\.uid, uid, ctx: ctx) {
+        if let found = findFirst(.with("uid", uid), ctx: ctx) {
             object = found
         } else {
             object = self.init(context: ctx)

@@ -19,42 +19,24 @@ public struct Change<T: NSManagedObject> {
 
 extension KeyPath {
     
-    var asString: String? {
+    var asString: String {
         if let path = _kvcKeyPathString {
             return path
         }
-        return String(describing: self).components(separatedBy: ".").last
+        fatalError("Cannot get string from keypath")
     }
-}
-
-public protocol AsCVarArg {
-    
-    var cVarArg: CVarArg { get }
-}
-
-extension UUID: AsCVarArg {
-    
-    public var cVarArg: CVarArg { self as CVarArg }
 }
 
 extension NSPredicate {
     
-    private static func with<U>(keyString: String, value: U) -> NSPredicate {
-        if let value = value as? AsCVarArg {
-            return NSPredicate(format: "\(keyString) == %@", value.cVarArg)
-        } else if let value = value as? CVarArg {
+    public static func with<U>(_ keyString: String, _ value: U) -> NSPredicate {
+        if let value = value as? CVarArg {
             return NSPredicate(format: "\(keyString) == %@", value)
+        } else if let value = value as? UUID {
+            return NSPredicate(format: "\(keyString) == %@", value as CVarArg)
         } else {
-            fatalError("Please add support of AsCVarArg to your value type: \(type(of: value))")
+            fatalError("This type is not supported for filtering in predicate: \(type(of: value))")
         }
-    }
-    
-    static func with<Fetchable, U>(_ keyPath: KeyPath<Fetchable, U>, _ value: U) -> NSPredicate {
-        with(keyString: keyPath.asString!, value: value)
-    }
-    
-    static func with<Fetchable, U>(_ keyPath: KeyPath<Fetchable, U?>, _ value: U) -> NSPredicate {
-        with(keyString: keyPath.asString!, value: value)
     }
 }
 
@@ -120,7 +102,7 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     static func find<U>(_ keyPath: KeyPath<Self, U>,
                         _ value: U,
                         ctx: NSManagedObjectContext) -> [Self] {
-        find(predicate: .with(keyPath, value), ctx: ctx)
+        find(predicate: .with(keyPath.asString, value), ctx: ctx)
     }
     
     @MainActor static func find<U>(_ keyPath: KeyPath<Self, U?>,
@@ -132,7 +114,7 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     static func find<U>(_ keyPath: KeyPath<Self, U?>,
                         _ value: U,
                         ctx: NSManagedObjectContext) -> [Self] {
-        find(predicate: .with(keyPath, value), ctx: ctx)
+        find(predicate: .with(keyPath.asString, value), ctx: ctx)
     }
     
     @MainActor static func find(_ database: Database,
@@ -174,7 +156,7 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     static func findFirst<U>(_ keyPath: KeyPath<Self, U>,
                              _ value: U,
                              ctx: NSManagedObjectContext) -> Self? {
-        findFirst(predicate: .with(keyPath, value), ctx: ctx)
+        findFirst(.with(keyPath.asString, value), ctx: ctx)
     }
     
     @MainActor static func findFirst<U>(_ keyPath: KeyPath<Self, U?>,
@@ -183,10 +165,10 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
         findFirst(keyPath, value, ctx: database.viewContext)
     }
         
-    static func findFirst<U>(_ keyPath: KeyPath<Self, U?>,
+    static func findFirst<U>(_ keyPath: ReferenceWritableKeyPath<Self, U?>,
                              _ value: U,
                              ctx: NSManagedObjectContext) -> Self? {
-        findFirst(predicate: .with(keyPath, value), ctx: ctx)
+        findFirst(.with(keyPath.asString, value), ctx: ctx)
     }
     
     @MainActor static func findFirst(_ database: Database,
@@ -199,15 +181,14 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
                           _ format: String,
                           _ args: CVarArg...) -> Self? {
         let predicate = NSPredicate(format: format, arguments: getVaList(args))
-        return findFirst(predicate: predicate, ctx: ctx)
+        return findFirst(predicate, ctx: ctx)
     }
     
-    @MainActor static func findFirst(predicate: NSPredicate, _ database: Database) -> Self? {
-        findFirst(predicate: predicate, ctx: database.viewContext)
+    @MainActor static func findFirst(_ predicate: NSPredicate, _ database: Database) -> Self? {
+        findFirst(predicate, ctx: database.viewContext)
     }
     
-    static func findFirst(predicate: NSPredicate,
-                          ctx: NSManagedObjectContext) -> Self? {
+    static func findFirst(_ predicate: NSPredicate, ctx: NSManagedObjectContext) -> Self? {
         let request = NSFetchRequest<Self>()
         request.fetchLimit = 1
         request.predicate = predicate
