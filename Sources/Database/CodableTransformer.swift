@@ -37,7 +37,7 @@ public class CodableTransformer: ValueTransformer {
             }
         }
         
-        var object: Any {
+        func object() throws -> Any {
             switch self {
             case .string(let string):
                 return string
@@ -52,7 +52,7 @@ public class CodableTransformer: ValueTransformer {
             case .codableObject(let base64, let className):
                 let data = Data(base64Encoded: base64)!
                 let classObject = NSClassFromString(className) as! Decodable.Type
-                return try! classObject.decode(data)
+                return try classObject.decode(data)
             }
         }
     }
@@ -61,7 +61,7 @@ public class CodableTransformer: ValueTransformer {
 
     public override func reverseTransformedValue(_ value: Any?) -> Any? {
         guard let value = value as? Data else { return nil }
-        return try? Value.decode(value).object
+        return try? Value.decode(value).object()
     }
 
     public override class func allowsReverseTransformation() -> Bool { true }
