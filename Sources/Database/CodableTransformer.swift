@@ -44,10 +44,10 @@ public class CodableTransformer: ValueTransformer {
             case .number(let number):
                 return (try! JSONSerialization.jsonObject(with: number) as? [NSNumber])!.first!
             case .array(let array):
-                return array.map { $0.object }
+                return array.compactMap { try? $0.object() }
             case .dictionary(let dict):
                 return dict.reduce(into: [:], { result, item in
-                    result[item.key] = item.value.object
+                    result[item.key] = try? item.value.object()
                 })
             case .codableObject(let base64, let className):
                 let data = Data(base64Encoded: base64)!
