@@ -103,19 +103,30 @@ public extension Fetchable {
 
 public extension Fetchable where Self: NSManagedObject {
     
-    static func parse(_ array: [Source]?, additional: ((Self, Source)->())? = nil, ctx: NSManagedObjectContext) -> [Self] {
+    static func parse(_ array: [Source]?, additional: ((Self, Source)->())? = nil, deleteOldItems: Bool = false, ctx: NSManagedObjectContext) -> [Self] {
         guard let array = array else { return [] }
         
         var resultSet = Set<NSManagedObjectID>()
         var result: [Self] = []
         
+        var oldItems = Set<Self>()
+        
+        if deleteOldItems {
+            oldItems = Set(Self.all(ctx))
+        }
+        
         for source in array {
             if let object = findAndUpdate(source, ctx: ctx),
                !resultSet.contains(object.objectID) {
+                oldItems.remove(object)
                 resultSet.insert(object.objectID)
                 result.append(object)
                 additional?(object, source)
             }
+        }
+        
+        if deleteOldItems {
+            oldItems.forEach { $0.delete() }
         }
         return result
     }
@@ -148,13 +159,24 @@ public extension Fetchable where Self: NSManagedObject {
 
 public extension Fetchable where Self: NSManagedObject, Source == [String:Any] {
     
-    func parse<T: Fetchable & NSManagedObject>(_ dict: [String:Any], _ dbKey: ReferenceWritableKeyPath<Self, T?>, _ serviceKey: String) where T.Source == [String:Any] {
+    func parse<T: Fetchable & NSManagedObject>(_ dict: [String:Any], _ dbKey: ReferenceWritableKeyPath<Self, T?>, _ serviceKey: String, deleteOldItem: Bool = false) where T.Source == [String:Any] {
         if let value = dict[serviceKey], let ctx = managedObjectContext {
-            self[keyPath: dbKey] = T.findAndUpdate(value as? [String:Any], ctx: ctx)
+            let oldItem = self[keyPath: dbKey]
+            let updated = T.findAndUpdate(value as? [String:Any], ctx: ctx)
+            self[keyPath: dbKey] = updated
+            
+            if oldItem != updated, deleteOldItem {
+                oldItem?.delete()
+            }
         }
     }
     
-    func parse<T: Fetchable & NSManagedObject>(_ dict: [String:Any], _ dbKey: ReferenceWritableKeyPath<Self, Set<T>?>, _ serviceKey: String) where T.Source == [String:Any] {
+    func parse<T: Fetchable & NSManagedObject>(_ type: T.Type, 
+                                               _ dict: [String:Any],
+                                               _ dbKey: ReferenceWritableKeyPath<Self, NSSet?>,
+                                               _ serviceKey: String,
+                                               additional: ((T, [String:Any]) -> ())? = nil,
+                                               deleteOldItems: Bool = false) where T.Source == [String:Any] {
         if let value = dict[serviceKey], let ctx = managedObjectContext {
             var array: [[String : Any]] = []
             
@@ -163,7 +185,20 @@ public extension Fetchable where Self: NSManagedObject, Source == [String:Any] {
             } else if let value = value as? [Int64] {
                 array = value.map { return ["id" : $0] }
             }
-            self[keyPath: dbKey] = Set(T.parse(array, ctx: ctx))
+            
+            let oldItems: Set<T> = {
+                if let items = self[keyPath: dbKey] {
+                    return items as! Set<T>
+                }
+                return .init()
+            }()
+            
+            let updatedItems = Set(T.parse(array, additional: additional, ctx: ctx))
+            self[keyPath: dbKey] = NSSet(set: updatedItems)
+            
+            if deleteOldItems {
+                oldItems.subtracting(updatedItems).forEach { $0.delete() }
+            }
         }
     }
 }
