@@ -34,6 +34,8 @@ extension NSPredicate {
             return NSPredicate(format: "\(keyString) == %@", value as? NSNumber ?? value)
         } else if let value = value as? UUID {
             return NSPredicate(format: "\(keyString) == %@", value as CVarArg)
+        } else if let value = value as? NSObject?, value == nil {
+            return NSPredicate(format: "\(keyString) == nil")
         } else {
             fatalError("This type is not supported for filtering in predicate: \(type(of: value))")
         }
