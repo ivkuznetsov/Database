@@ -8,7 +8,7 @@ import os.log
 import Combine
 import CloudKit
 
-public final class Database {
+public actor Database: Sendable {
     
     private actor TaskSync {
         
@@ -27,8 +27,8 @@ public final class Database {
     private let historyQueue = DispatchQueue(label: "database.history")
     public let container: NSPersistentCloudKitContainer
     
-    public var viewContext: NSManagedObjectContext { container.viewContext }
-    public let writerContext: NSManagedObjectContext
+    @MainActor public var viewContext: NSManagedObjectContext { container.viewContext }
+    public nonisolated let writerContext: NSManagedObjectContext
     
     private var observers: [AnyCancellable] = []
     
@@ -42,47 +42,69 @@ public final class Database {
         writerContext.automaticallyMergesChangesFromParent = true
         writerContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         
-        viewContext.mergePolicy = NSRollbackMergePolicy
-        viewContext.name = "view"
-        viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSRollbackMergePolicy
+        container.viewContext.name = "view"
+        container.viewContext.automaticallyMergesChangesFromParent = true
         container.persistentStoreDescriptions = storeDescriptions
         
+        var observers: [AnyCancellable] = []
         if storeDescriptions.contains(where: { $0.options[NSPersistentHistoryTrackingKey] as? NSNumber == true }) {
-            NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange).sink { [weak self] in
-                self?.didRemoteChange(notification: $0)
+            NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange).sink { [self] in
+                didRemoteChange(notification: $0)
             }.store(in: &observers)
         } else {
-            NotificationCenter.default.publisher(for: NSManagedObjectContext.didMergeChangesObjectIDsNotification).sink { [weak self] in
-                self?.didMerge($0)
+            NotificationCenter.default.publisher(for: NSManagedObjectContext.didMergeChangesObjectIDsNotification).sink { [self] notification in
+                Task { await didMerge(notification) }
             }.store(in: &observers)
         }
-        
-        setup()
+        Task {
+            await store(observers)
+            await setup()
+        }
     }
     
-    private func historyToken(with storeUUID: String) -> NSPersistentHistoryToken? {
+    private func store(_ observers: [AnyCancellable]) {
+        self.observers = observers
+    }
+    
+    private func setup() {
+        container.loadPersistentStores { description, error in
+            if let error = error {
+                os_log("Error while creating persistent store: %@ for configuration %@", error.localizedDescription, description.configuration!)
+                
+                if (error as NSError).code == 134110 { //couldn't migrate in-place
+                    description.removeStoreFiles()
+                    self.setup()
+                }
+            } else {
+                os_log("Store has been added: %@", description.url!.path)
+            }
+        }
+    }
+    
+    private nonisolated func historyToken(with storeUUID: String) -> NSPersistentHistoryToken? {
         if let data = UserDefaults.standard.data(forKey: "HistoryToken" + storeUUID) {
             return try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSPersistentHistoryToken.self, from: data)
         }
         return nil
     }
     
-    private func updateHistoryToken(with storeUUID: String, newToken: NSPersistentHistoryToken) {
+    private nonisolated func updateHistoryToken(with storeUUID: String, newToken: NSPersistentHistoryToken) {
         let data = try? NSKeyedArchiver.archivedData(withRootObject: newToken, requiringSecureCoding: true)
         UserDefaults.standard.set(data, forKey: "HistoryToken" + storeUUID)
     }
     
-    public struct Change {
+    public struct Change: Sendable {
         public let classes: Set<String>
         public let inserted: Set<NSManagedObjectID>
         public let updated: Set<NSManagedObjectID>
         public let deleted: Set<NSManagedObjectID>
     }
     
-    public let objectsDidChange = PassthroughSubject<Change, Never>()
-    public let sharePublisher = PassthroughSubject<Void, Never>()
+    public nonisolated let objectsDidChange = PassthroughSubject<Change, Never>()
+    public nonisolated let sharePublisher = PassthroughSubject<Void, Never>()
     
-    private func didRemoteChange(notification: Notification) {
+    private nonisolated func didRemoteChange(notification: Notification) {
         guard let storeUUID = notification.userInfo?[NSStoreUUIDKey] as? String,
               let privateStore = privateStore,
               let sharedStore = sharedStore,
@@ -111,7 +133,7 @@ public final class Database {
                     }
                     
                     if transactions.isEmpty { // when transaction is empty it looks like CKShare is changed
-                        DispatchQueue.onMain {
+                        Task { @MainActor in
                             self.sharePublisher.send()
                         }
                     } else {
@@ -153,7 +175,7 @@ public final class Database {
                         }
                         
                         if classes.count > 0 {
-                            DispatchQueue.onMain {
+                            Task { @MainActor in
                                 self.objectsDidChange.send(Change(classes: classes,
                                                                   inserted: inserted,
                                                                   updated: updated,
@@ -166,9 +188,9 @@ public final class Database {
         }
     }
     
-    private func didMerge(_ notification: Notification) {
+    private nonisolated func didMerge(_ notification: Notification) async {
         if let context = notification.object as? NSManagedObjectContext,
-            context == viewContext,
+           await context == viewContext,
             let userInfo = notification.userInfo {
             
             var classes = Set<String>()
@@ -191,30 +213,17 @@ public final class Database {
             let deleted = extract("deleted_objectIDs")
             
             if classes.count > 0 {
-                objectsDidChange.send(Change(classes: classes,
-                                             inserted: inserted,
-                                             updated: updated,
-                                             deleted: deleted))
-            }
-        }
-    }
-    
-    private func setup() {
-        container.loadPersistentStores { description, error in
-            if let error = error {
-                os_log("Error while creating persistent store: %@ for configuration %@", error.localizedDescription, description.configuration!)
-                
-                if (error as NSError).code == 134110 { //couldn't migrate in-place
-                    description.removeStoreFiles()
-                    self.setup()
+                Task { @MainActor [classes] in
+                    objectsDidChange.send(Change(classes: classes,
+                                                 inserted: inserted,
+                                                 updated: updated,
+                                                 deleted: deleted))
                 }
-            } else {
-                os_log("Store has been added: %@", description.url!.path)
             }
         }
     }
     
-    public var privateStore: NSPersistentStore? {
+    public nonisolated var privateStore: NSPersistentStore? {
         let description = container.persistentStoreDescriptions.first {
             if let options = $0.cloudKitContainerOptions {
                 return options.databaseScope == .private
@@ -228,7 +237,7 @@ public final class Database {
         return nil
     }
     
-    public var sharedStore: NSPersistentStore? {
+    public nonisolated var sharedStore: NSPersistentStore? {
         if let url = container.persistentStoreDescriptions.first(where: {
             $0.cloudKitContainerOptions?.databaseScope == .shared
         })?.url {
@@ -238,17 +247,17 @@ public final class Database {
     }
     
     @discardableResult
-    func onEdit<T>(_ closure: @escaping () async throws ->T) async throws -> T {
+    nonisolated func onEdit<T>(_ closure: @escaping () async throws ->T) async throws -> T {
         try await editSync.run {
             try await closure()
         }
     }
     
-    public func idFor(uriRepresentation: URL) -> NSManagedObjectID? {
+    public nonisolated func idFor(uriRepresentation: URL) -> NSManagedObjectID? {
         container.persistentStoreCoordinator.managedObjectID(forURIRepresentation: uriRepresentation)
     }
     
-    public func createPrivateContext(mergeChanges: Bool) -> NSManagedObjectContext {
+    public nonisolated func createPrivateContext(mergeChanges: Bool) -> NSManagedObjectContext {
         let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         context.transactionAuthor = "app"
@@ -257,18 +266,7 @@ public final class Database {
         return context
     }
     
-    public func createPrivateContext() -> NSManagedObjectContext {
+    public nonisolated func createPrivateContext() -> NSManagedObjectContext {
         createPrivateContext(mergeChanges: false)
-    }
-}
-
-extension DispatchQueue {
-    
-    static func onMain(_ closure: @escaping ()->()) {
-        if Thread.isMainThread {
-            closure()
-        } else {
-            main.async(execute: closure)
-        }
     }
 }

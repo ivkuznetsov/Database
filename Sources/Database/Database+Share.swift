@@ -11,7 +11,7 @@ import CloudKit
 
 extension CKShare: @unchecked Sendable { }
 
-extension CKShare.Metadata: @unchecked Sendable { }
+extension CKShare.Metadata: @unchecked @retroactive Sendable { }
 
 @available(iOS 16.0, *)
 public extension Database {

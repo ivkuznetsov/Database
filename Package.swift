@@ -7,7 +7,7 @@ let package = Package(
     name: "Database",
     platforms: [
         .macOS(.v10_15),
-        .iOS(.v14)
+        .iOS(.v15)
     ],
     products: [
         .library(name: "Database", targets: ["Database"])
