@@ -13,7 +13,7 @@ public extension WithObjectId where Self: NSManagedObject {
 
 extension NSManagedObject: WithObjectId { }
 
-public struct ObjectId<T: NSManagedObject>: Hashable {
+public struct ObjectId<T: NSManagedObject>: Hashable, Sendable {
     public let objectId: NSManagedObjectID
     
     public init(_ object: T) {
