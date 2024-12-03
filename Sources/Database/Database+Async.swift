@@ -27,17 +27,9 @@ extension NSManagedObject: ValueOnMoc {}
 
 public extension NSManagedObject {
     
-    func onMoc<T>(_ block: @Sendable @escaping ()->T) async throws -> T {
+    func onMoc<T>(_ block: @Sendable @escaping () throws -> T) async throws -> T {
         if let ctx = managedObjectContext {
-            if #available(iOS 15, macOS 12, *) {
-                return await ctx.perform { block() }
-            } else {
-                return await withCheckedContinuation { continuation in
-                    ctx.perform {
-                        continuation.resume(with: .success(block()))
-                    }
-                }
-            }
+            return try await ctx.perform { try block() }
         }
         throw CancellationError()
     }
