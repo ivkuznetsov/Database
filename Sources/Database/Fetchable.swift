@@ -101,6 +101,11 @@ public extension Fetchable {
     }
 }
 
+public protocol CustomPredicate {
+    
+    var searchPredicate: NSPredicate { get }
+}
+
 public extension Fetchable where Self: NSManagedObject {
     
     static func parse(_ array: [Source]?, additional: ((Self, Source)->())? = nil, deleteOldItems: Bool = false, ctx: NSManagedObjectContext) -> [Self] {

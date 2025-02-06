@@ -30,7 +30,9 @@ extension KeyPath {
 extension NSPredicate {
     
     public static func with<U>(_ keyString: String, _ value: U) -> NSPredicate {
-        if let value = value as? CVarArg {
+        if let value = value as? CustomPredicate {
+            return value.searchPredicate
+        } else if let value = value as? CVarArg {
             return NSPredicate(format: "\(keyString) == %@", value as? NSNumber ?? value)
         } else if let value = value as? UUID {
             return NSPredicate(format: "\(keyString) == %@", value as CVarArg)
