@@ -11,7 +11,7 @@ extension NSManagedObject: ManagedObjectHelpers { }
 
 public protocol ManagedObjectHelpers { }
 
-public struct Change<T: NSManagedObject> {
+public struct Change<T: NSManagedObject>: Sendable {
     public let inserted: Set<ObjectId<T>>
     public let updated: Set<ObjectId<T>>
     public let deleted: Set<ObjectId<T>>
