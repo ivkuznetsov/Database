@@ -136,6 +136,28 @@ public extension Fetchable where Self: NSManagedObject {
         return result
     }
     
+    func parseChildren<T: Fetchable & NSManagedObject>(_ type: T.Type,
+                                                       _ array: [T.Source]?,
+                                                       _ dbKey: ReferenceWritableKeyPath<Self, NSSet?>,
+                                                       additional: ((T, T.Source) -> ())? = nil,
+                                                       deleteOldItems: Bool = false) {
+        if let array, let ctx = managedObjectContext {
+            let oldItems: Set<T> = {
+                if let items = self[keyPath: dbKey] {
+                    return items as! Set<T>
+                }
+                return .init()
+            }()
+            
+            let updatedItems = Set(T.parse(array, additional: additional, ctx: ctx))
+            self[keyPath: dbKey] = NSSet(set: updatedItems)
+            
+            if deleteOldItems {
+                oldItems.subtracting(updatedItems).forEach { $0.delete() }
+            }
+        }
+    }
+    
     static func findOrCreatePlaceholder(uid: Id, ctx: NSManagedObjectContext) -> Self {
         var object: Self
         
