@@ -6,7 +6,7 @@ import Foundation
 
 public class CodableTransformer: ValueTransformer {
     
-    private indirect enum Value: Codable {
+    public indirect enum Value: Codable {
         case string(String)
         case number(Data)
         case codableObject(base64: String, name: String)
@@ -51,8 +51,13 @@ public class CodableTransformer: ValueTransformer {
                 })
             case .codableObject(let base64, let className):
                 let data = Data(base64Encoded: base64)!
-                let classObject = NSClassFromString(className) as! Decodable.Type
-                return try classObject.decode(data)
+                
+                if let classObject = NSClassFromString(className) as? Decodable.Type {
+                    return try classObject.decode(data)
+                } else {
+                    print("Cannot find class \(className) for decoding object")
+                    return data
+                }
             }
         }
     }

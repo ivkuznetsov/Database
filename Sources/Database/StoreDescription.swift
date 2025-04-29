@@ -6,6 +6,8 @@ import Foundation
 import CoreData
 import CloudKit
 
+extension NSPersistentStoreDescription: @unchecked @retroactive Sendable { }
+
 public extension NSPersistentStoreDescription {
     
     enum Configuration {

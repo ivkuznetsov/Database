@@ -34,8 +34,14 @@ public actor Database: Sendable {
     
     public init(storeDescriptions: [NSPersistentStoreDescription] = [.dataStore()],
                 modelBundle: Bundle = Bundle.main) {
-        
         let model = NSManagedObjectModel.mergedModel(from: [modelBundle])!
+        
+        do {
+            try MigrationHelper().migrateIfNeeded(descriptions: storeDescriptions, bundle: modelBundle, finalModel: model)
+        } catch {
+            print("migration failed: \(error)")
+        }
+        
         container = NSPersistentCloudKitContainer(name: "Database", managedObjectModel: model)
         
         writerContext = container.newBackgroundContext()
