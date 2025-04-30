@@ -61,6 +61,18 @@ struct MigrationHelper {
         }
     }
     
+    func storeURLs(_ baseURL: URL, suffix: String = "") -> [URL] {
+        var storeURLs: [URL] = []
+        
+        ["", "-wal", "-shm"].forEach {
+            let url = baseURL.deletingLastPathComponent()
+                .appendingPathComponent(baseURL.deletingPathExtension().lastPathComponent + suffix)
+                .appendingPathExtension(baseURL.pathExtension + $0)
+            storeURLs.append(url)
+        }
+        return storeURLs
+    }
+    
     func performMigration(from sourceModel: NSManagedObjectModel,
                           to destinationModel: NSManagedObjectModel,
                           storeURL: URL,
@@ -69,8 +81,11 @@ struct MigrationHelper {
         
         let migrationManager = NSMigrationManager(sourceModel: sourceModel, destinationModel: destinationModel)
         
-        let destinationURL = storeURL.deletingLastPathComponent()
-            .appendingPathComponent("Temp-\(UUID().uuidString)")
+        let fm = FileManager.default
+        
+        let storeURLs = storeURLs(storeURL)
+        let destinationURLs = self.storeURLs(storeURL, suffix: "Temp")
+        destinationURLs.forEach { try? fm.removeItem(at: $0) }
         
         let mappingModel = try NSMappingModel(from: [bundle], forSourceModel: sourceModel, destinationModel: destinationModel) ??
         NSMappingModel.inferredMappingModel(forSourceModel: sourceModel, destinationModel: destinationModel)
@@ -78,37 +93,36 @@ struct MigrationHelper {
         try migrationManager.migrateStore(from: storeURL,
                                           sourceType: storeType,
                                           with: mappingModel,
-                                          toDestinationURL: destinationURL,
+                                          toDestinationURL: destinationURLs[0],
                                           destinationType: storeType)
         
-        var storeURLs: [URL] = [storeURL]
-        let fm = FileManager.default
+        let backupURLs = self.storeURLs(storeURL, suffix: "Backup")
+        backupURLs.forEach { try? fm.removeItem(at: $0) }
         
-        func add(_ resultExtension: String) {
-            let url = storeURL.deletingPathExtension().appendingPathExtension(resultExtension)
-            
-            if fm.fileExists(atPath: url.path) {
-                storeURLs.append(url)
+        try storeURLs.enumerated().forEach {
+            if fm.fileExists(atPath: $1.path) {
+                try fm.moveItem(at: $1, to: backupURLs[$0])
             }
-        }
-        add("sqlite-wal")
-        add("sqlite-shm")
-        
-        try storeURLs.forEach {
-            try fm.copyItem(at: $0, to: $0.appendingPathExtension("backup"))
         }
         
         do {
-            try storeURLs.forEach {
-                try fm.removeItem(at: $0)
+            storeURLs.forEach {
+                try? fm.removeItem(at: $0)
+            }
+            try destinationURLs.enumerated().forEach {
+                if fm.fileExists(atPath: $1.path) {
+                    try fm.moveItem(at: $1, to: storeURLs[$0])
+                }
             }
             
-            try FileManager.default.moveItem(at: destinationURL, to: storeURL)
+            backupURLs.forEach { try? fm.removeItem(at: $0) }
         } catch {
             print("failed to copy database friles file: \(error.localizedDescription)")
             
-            storeURLs.forEach {
-                try? fm.moveItem(at: $0.appendingPathExtension("backup"), to: $0)
+            backupURLs.enumerated().forEach {
+                if fm.fileExists(atPath: $1.path) {
+                    try? fm.moveItem(at: $1, to: storeURLs[$0])
+                }
             }
         }
     }
