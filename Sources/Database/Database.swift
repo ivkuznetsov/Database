@@ -39,6 +39,9 @@ public actor Database: Sendable {
         do {
             try MigrationHelper().migrateIfNeeded(descriptions: storeDescriptions, bundle: modelBundle, finalModel: model)
         } catch {
+            if error is MigrationHelper.Error {
+                storeDescriptions.forEach { $0.shouldInferMappingModelAutomatically = true }
+            }
             print("migration failed: \(error)")
         }
         

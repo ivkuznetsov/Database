@@ -19,6 +19,11 @@ extension NSManagedObjectModel {
 
 struct MigrationHelper {
     
+    enum Error: Swift.Error {
+        case unknownModel
+        case migrationFailed(Swift.Error)
+    }
+    
     private func allModels(bundle: Bundle) throws -> [NSManagedObjectModel] {
         guard let resourceUrl = bundle.resourceURL else {
             return []
@@ -47,14 +52,18 @@ struct MigrationHelper {
             let metadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(type: .init(rawValue: description.type), at: url)
             
             guard var currentModel = NSManagedObjectModel.mergedModel(from: [bundle], forStoreMetadata: metadata) else {
-                return
+                throw Error.unknownModel
             }
                 
             guard finalModel.version != currentModel.version else { return }
                 
             try allModels(bundle: bundle).forEach {
                 if $0.version > currentModel.version {
-                    try performMigration(from: currentModel, to: $0, storeURL: url, storeType: description.type, bundle: bundle)
+                    do {
+                        try performMigration(from: currentModel, to: $0, storeURL: url, storeType: description.type, bundle: bundle)
+                    } catch {
+                        throw Error.migrationFailed(error)
+                    }
                     currentModel = $0
                 }
             }
