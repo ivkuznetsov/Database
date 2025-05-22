@@ -53,7 +53,12 @@ public class CodableTransformer: ValueTransformer {
                 let data = Data(base64Encoded: base64)!
                 
                 if let classObject = NSClassFromString(className) as? Decodable.Type {
-                    return try classObject.decode(data)
+                    do {
+                        return try classObject.decode(data)
+                    } catch {
+                        print("Cannot decode object of class: \(className), error: \(error)")
+                        throw error
+                    }
                 } else {
                     print("Cannot find class \(className) for decoding object")
                     return data
