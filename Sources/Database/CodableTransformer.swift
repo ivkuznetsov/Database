@@ -25,7 +25,12 @@ public class CodableTransformer: ValueTransformer {
             } else if let value = value as? [Encodable] {
                 self = .array(value.compactMap { Value(value: $0) })
             } else if let value = value as? AnyObject & Encodable {
-                self = .codableObject(base64: try! value.toData().base64EncodedString(), name: NSStringFromClass(type(of: value)))
+                do {
+                    self = .codableObject(base64: try value.toData().base64EncodedString(), name: NSStringFromClass(type(of: value)))
+                } catch {
+                    print("Cannote encode object: \(value), error: \(error)")
+                    return nil
+                }
             } else if let value = value as? [String:Any] {
                 self = .dictionary(value.reduce(into: [:], { result, item in
                     if let value = Value(value: item.value) {
