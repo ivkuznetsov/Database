@@ -4,6 +4,32 @@
 
 import Foundation
 
+open class Transformer<T: Codable>: ValueTransformer {
+    
+    public override class func transformedValueClass() -> AnyClass { NSData.self }
+    
+    public override class func allowsReverseTransformation() -> Bool { true }
+    
+    public override func transformedValue(_ value: Any?) -> Any? {
+        guard let value = value as? T else {
+            print("Invalid value type: \(String(describing: value))")
+            return nil
+        }
+        
+        do {
+            return try JSONEncoder().encode(value)
+        } catch {
+            print("Cannote encode object: \(value), error: \(error)")
+            return nil
+        }
+    }
+    
+    public override func reverseTransformedValue(_ value: Any?) -> Any? {
+        guard let data = value as? Data else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+}
+
 public class CodableTransformer: ValueTransformer {
     
     public indirect enum Value: Codable {
