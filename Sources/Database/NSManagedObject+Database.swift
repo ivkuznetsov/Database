@@ -12,9 +12,9 @@ extension NSManagedObject: ManagedObjectHelpers { }
 public protocol ManagedObjectHelpers { }
 
 public struct Change<T: NSManagedObject>: Sendable {
-    public let inserted: Set<ObjectId<T>>
-    public let updated: Set<ObjectId<T>>
-    public let deleted: Set<ObjectId<T>>
+    public let inserted: Set<T.Id>
+    public let updated: Set<T.Id>
+    public let deleted: Set<T.Id>
 }
 
 extension KeyPath {
@@ -48,9 +48,9 @@ public extension ManagedObjectHelpers where Self: NSManagedObject {
     
     static func didChange(_ database: Database) -> AnyPublisher<Change<Self>, Never> {
         objectsDidChange(database).map {
-            Change(inserted: Set($0.inserted.map { ObjectId<Self>($0) }),
-                   updated: Set($0.updated.map { ObjectId<Self>($0) }),
-                   deleted: Set($0.deleted.map { ObjectId<Self>($0) }))
+            Change(inserted: Set($0.inserted.map { Self.Id($0) }),
+                   updated: Set($0.updated.map { Self.Id($0) }),
+                   deleted: Set($0.deleted.map { Self.Id($0) }))
         }.eraseToAnyPublisher()
     }
     

@@ -83,7 +83,7 @@ public extension Database {
         }
     }
     
-    func edit<T, R>(_ objectId: ObjectId<T>, _ closure: @Sendable @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+    func edit<T: NSManagedObject, R>(_ objectId: T.Id, _ closure: @Sendable @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
         try await edit { ctx in
             if let object = objectId.object(ctx) {
                 return try closure(object, ctx)
@@ -104,7 +104,7 @@ public extension Database {
         }
     }
     
-    func edit<T1, T2, R>(_ objectId1: ObjectId<T1>, _ objectId2: ObjectId<T2>, _ closure: @Sendable @escaping (T1, T2, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+    func edit<T1: NSManagedObject, T2: NSManagedObject, R>(_ objectId1: T1.Id, _ objectId2: T2.Id, _ closure: @Sendable @escaping (T1, T2, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
         try await edit { ctx in
             if let object1 = objectId1.object(ctx), let object2 = objectId2.object(ctx) {
                 return try closure(object1, object2, ctx)
@@ -154,7 +154,7 @@ public extension Database {
         }
     }
     
-    func fetch<T, R>(_ objectId: ObjectId<T>, _ closure: @Sendable @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+    func fetch<T: NSManagedObject, R>(_ objectId: T.Id, _ closure: @Sendable @escaping (T, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
         try await fetch { ctx in
             if let object = objectId.object(ctx) {
                 return try closure(object, ctx)
@@ -168,7 +168,7 @@ public extension Database {
         try await fetch(object.getObjectId, closure)
     }
     
-    func fetch<T1, T2, R>(_ objectId1: ObjectId<T1>, _ objectId2: ObjectId<T2>, _ closure: @escaping (T1, T2, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
+    func fetch<T1: NSManagedObject, T2: NSManagedObject, R>(_ objectId1: T1.Id, _ objectId2: T2.Id, _ closure: @escaping (T1, T2, _ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
         try await fetch { ctx in
             if let object1 = objectId1.object(ctx), let object2 = objectId2.object(ctx) {
                 return try closure(object1, object2, ctx)

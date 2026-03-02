@@ -7,6 +7,7 @@ import CoreData
 public protocol WithObjectId {}
 
 public extension WithObjectId where Self: NSManagedObject {
+    typealias Id = ObjectId<Self>
     
     var getObjectId: ObjectId<Self> { ObjectId(self) }
 }
@@ -54,6 +55,6 @@ public extension Sequence {
 
 public extension Sequence where Element: NSManagedObject {
     
-    var ids: [ObjectId<Element>] { map { $0.getObjectId } }
+    var ids: [Element.Id] { map { $0.getObjectId } }
 }
 

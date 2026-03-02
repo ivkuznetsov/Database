@@ -11,14 +11,14 @@ public protocol Uploadable: Fetchable {
 }
 
 public protocol Fetchable {
-    associatedtype Id
+    associatedtype FetchUID
     associatedtype Source
     
-    var uid: Id { get set }
+    var uid: FetchUID { get set }
     func update(_ source: Source)
     
-    static func uid(from source: Source) -> Id
-    static func isValid(uid: Id) -> Bool
+    static func uid(from source: Source) -> FetchUID
+    static func isValid(uid: FetchUID) -> Bool
     static func isValid(source: Source) -> Bool
 }
 
@@ -27,17 +27,17 @@ public extension Fetchable {
     static func isValid(source: Source) -> Bool { true }
 }
 
-public extension Fetchable where Id == String? {
+public extension Fetchable where FetchUID == String? {
     
     static func isValid(uid: String?) -> Bool { uid != nil }
 }
 
-public extension Fetchable where Id == UUID? {
+public extension Fetchable where FetchUID == UUID? {
     
     static func isValid(uid: UUID?) -> Bool { uid != nil }
 }
 
-public extension Fetchable where Source == [String:Any], Id == String? {
+public extension Fetchable where Source == [String:Any], FetchUID == String? {
     
     static func uid(from source: [String:Any]) -> String? {
         var uid = source["uid"] as? String ?? source["id"] as? String
@@ -52,7 +52,7 @@ public extension Fetchable where Source == [String:Any], Id == String? {
     }
 }
 
-public extension Fetchable where Source == [String:Any], Id == UUID? {
+public extension Fetchable where Source == [String:Any], FetchUID == UUID? {
     
     static func uid(from source: [String:Any]) -> UUID? {
         if let uid = source["uid"] as? String ?? source["id"] as? String,
@@ -158,7 +158,7 @@ public extension Fetchable where Self: NSManagedObject {
         }
     }
     
-    static func findOrCreatePlaceholder(uid: Id, ctx: NSManagedObjectContext) -> Self {
+    static func findOrCreatePlaceholder(uid: FetchUID, ctx: NSManagedObjectContext) -> Self {
         var object: Self
         
         if let found = findFirst(.with("uid", uid), ctx: ctx) {
