@@ -119,17 +119,15 @@ public extension Database {
     }
     
     func fetch<R>(_ closure: @Sendable @escaping (_ ctx: NSManagedObjectContext) throws -> R) async throws -> R {
-        let context = createPrivateContext()
-        
         if #available(iOS 15, macOS 12, *) {
-            return try await context.perform {
-                try closure(context)
+            return try await writerContext.perform {
+                try closure(self.writerContext)
             }
         } else {
             return try await withCheckedThrowingContinuation { continuation in
-                context.perform {
+                writerContext.perform {
                     do {
-                        continuation.resume(with: .success(try closure(context)))
+                        continuation.resume(with: .success(try closure(self.writerContext)))
                     } catch {
                         continuation.resume(with: .failure(error))
                     }
