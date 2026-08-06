@@ -106,6 +106,12 @@ public protocol CustomPredicate {
     var searchPredicate: NSPredicate { get }
 }
 
+public enum DeleteStrategy {
+    case delete
+    case nullifyReference
+    case ignore
+}
+
 public extension Fetchable where Self: NSManagedObject {
     
     static func parse(_ array: [Source]?, additional: ((Self, Source)->())? = nil, deleteOldItems: Bool = false, ctx: NSManagedObjectContext) -> [Self] {
@@ -141,6 +147,14 @@ public extension Fetchable where Self: NSManagedObject {
                                                        _ dbKey: ReferenceWritableKeyPath<Self, NSSet?>,
                                                        additional: ((T, T.Source) -> ())? = nil,
                                                        deleteOldItems: Bool = false) {
+        parseChildren(type, array, dbKey, additional: additional, deleteStrategy: { _ in deleteOldItems ? .delete : .nullifyReference })
+    }
+    
+    func parseChildren<T: Fetchable & NSManagedObject>(_ type: T.Type,
+                                                       _ array: [T.Source]?,
+                                                       _ dbKey: ReferenceWritableKeyPath<Self, NSSet?>,
+                                                       additional: ((T, T.Source) -> ())? = nil,
+                                                       deleteStrategy: (T)->DeleteStrategy) {
         if let array, let ctx = managedObjectContext {
             let oldItems: Set<T> = {
                 if let items = self[keyPath: dbKey] {
@@ -149,12 +163,17 @@ public extension Fetchable where Self: NSManagedObject {
                 return .init()
             }()
             
-            let updatedItems = Set(T.parse(array, additional: additional, ctx: ctx))
-            self[keyPath: dbKey] = NSSet(set: updatedItems)
+            var updatedItems = Set(T.parse(array, additional: additional, ctx: ctx))
             
-            if deleteOldItems {
-                oldItems.subtracting(updatedItems).forEach { $0.delete() }
+            oldItems.subtracting(updatedItems).forEach {
+                switch deleteStrategy($0) {
+                case .delete: $0.delete()
+                case .ignore: updatedItems.insert($0)
+                case .nullifyReference: break
+                }
             }
+            
+            self[keyPath: dbKey] = NSSet(set: updatedItems)
         }
     }
     
